@@ -15,6 +15,10 @@ run/main_scene="res://root.tscn"
 config/features=PackedStringArray("4.4", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
+[debug]
+
+file_logging/enable_file_logging=true
+
 [dotnet]
 
 project/assembly_name="traintracks"

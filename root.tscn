@@ -1,10 +1,17 @@
-[gd_scene load_steps=6 format=3 uid="uid://d2kbmwotnxj6s"]
+[gd_scene load_steps=7 format=3 uid="uid://d2kbmwotnxj6s"]
 
 [ext_resource type="PackedScene" uid="uid://kvmh816bsled" path="res://track-straight.tscn" id="1_pq8q7"]
 [ext_resource type="Texture2D" uid="uid://esqtqyof1dqp" path="res://images/grass-hex-2-lg.png" id="2_28aoi"]
 [ext_resource type="PackedScene" uid="uid://d2yocfphkr8gk" path="res://hextile.tscn" id="2_pyidc"]
 [ext_resource type="PackedScene" uid="uid://d0fccyec7fdv8" path="res://Train.tscn" id="3_vvh5c"]
 [ext_resource type="PackedScene" uid="uid://c18hkxq8jxept" path="res://track-bend.tscn" id="5_jnlp7"]
+
+[sub_resource type="Curve3D" id="Curve3D_jnlp7"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 2, 0, 0, -4.5, 0, 0, -2, 0, 0, 0, 0, 15, 4.5),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
 
 [node name="Node3D" type="Node3D"]
 
@@ -20,7 +27,8 @@ Texture = ExtResource("2_28aoi")
 transform = Transform3D(0.75631, -0.333994, 0.562532, -1.31143e-08, 0.859861, 0.510528, -0.654213, -0.386117, 0.650322, 4.70806, 3.87026, 7.39282)
 
 [node name="Track-straight" parent="." instance=ExtResource("1_pq8q7")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -11)
+Curve = SubResource("Curve3D_jnlp7")
 
 [node name="Train2" parent="." instance=ExtResource("3_vvh5c")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.5)
