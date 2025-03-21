@@ -1,0 +1,21 @@
+﻿using Godot;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace traintracks;
+
+public static class NodeExtensions
+{
+    public static IEnumerable<T> GetChildrenByType<T>(this Node node) where T : Node
+    {
+        foreach (Node child in node.GetChildren())
+            if (child is T t)
+                yield return t;
+    }
+
+    public static T FindChild<T>(this Node node, string name, bool recursive = true) where T : Node 
+        => node.FindChild(name, recursive) is T t ? t : throw new NullReferenceException($"Attempt to find child {name} - {node.GetPath().GetConcatenatedNames()}");
+}

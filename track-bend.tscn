@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://c18hkxq8jxept"]
+
+[ext_resource type="PackedScene" uid="uid://2rfjwx2gwu25" path="res://models/traintrack-bend.fbx" id="1_jwpik"]
+
+[node name="Track-bend" type="Node3D"]
+
+[node name="traintrack-bend" parent="." instance=ExtResource("1_jwpik")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.532061, 0, 0.33371)

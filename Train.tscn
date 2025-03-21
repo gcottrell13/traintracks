@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://d0fccyec7fdv8"]
+
+[ext_resource type="PackedScene" uid="uid://ccx8brpmgqmvm" path="res://models/train1.fbx" id="1_vv4kd"]
+
+[node name="Train" type="Node3D"]
+
+[node name="train1" parent="." instance=ExtResource("1_vv4kd")]

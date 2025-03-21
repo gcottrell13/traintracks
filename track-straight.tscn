@@ -1,0 +1,33 @@
+[gd_scene load_steps=6 format=3 uid="uid://kvmh816bsled"]
+
+[ext_resource type="Script" uid="uid://ejwaht374qy7" path="res://TrackStraight.cs" id="1_dle0x"]
+[ext_resource type="Texture2D" uid="uid://b0sgy4k7hkax7" path="res://images/1.png" id="2_dle0x"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_dle0x"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_7ox47"]
+albedo_texture = ExtResource("2_dle0x")
+
+[sub_resource type="BoxMesh" id="BoxMesh_jtgdp"]
+material = SubResource("StandardMaterial3D_7ox47")
+
+[node name="Track-straight" type="Node3D"]
+script = ExtResource("1_dle0x")
+
+[node name="Area3D" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.5)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D"]
+shape = SubResource("SphereShape3D_dle0x")
+
+[node name="Area3D2" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.49975)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D2"]
+shape = SubResource("SphereShape3D_dle0x")
+
+[node name="track" type="Node3D" parent="."]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -4.29758)
+mesh = SubResource("BoxMesh_jtgdp")

@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://cyiciqg5q86gl"
+path="res://.godot/imported/hexagon.obj-a0739ea77732d21c801fe20e8f1f7b60.mesh"
+
+[deps]
+
+files=["res://.godot/imported/hexagon.obj-a0739ea77732d21c801fe20e8f1f7b60.mesh"]
+
+source_file="res://models/hexagon.obj"
+dest_files=["res://.godot/imported/hexagon.obj-a0739ea77732d21c801fe20e8f1f7b60.mesh", "res://.godot/imported/hexagon.obj-a0739ea77732d21c801fe20e8f1f7b60.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(5.78, 1, 5.78)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false
