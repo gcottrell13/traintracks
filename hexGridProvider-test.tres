@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="HexGridProvider" load_steps=2 format=3 uid="uid://fd5516e2ffg1"]
+
+[ext_resource type="Script" uid="uid://daa1dtl068ybo" path="res://HexGridProvider.cs" id="1_0eedj"]
+
+[resource]
+script = ExtResource("1_0eedj")
+Transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+Size = 6.0
+GridType = 1
+metadata/_custom_type_script = "uid://daa1dtl068ybo"

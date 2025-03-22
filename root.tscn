@@ -1,14 +1,21 @@
-[gd_scene load_steps=7 format=3 uid="uid://d2kbmwotnxj6s"]
+[gd_scene load_steps=8 format=3 uid="uid://d2kbmwotnxj6s"]
 
 [ext_resource type="PackedScene" uid="uid://kvmh816bsled" path="res://track-straight.tscn" id="1_pq8q7"]
 [ext_resource type="Texture2D" uid="uid://esqtqyof1dqp" path="res://images/grass-hex-2-lg.png" id="2_28aoi"]
 [ext_resource type="PackedScene" uid="uid://d2yocfphkr8gk" path="res://hextile.tscn" id="2_pyidc"]
+[ext_resource type="Resource" uid="uid://fd5516e2ffg1" path="res://hexGridProvider-test.tres" id="3_jnlp7"]
 [ext_resource type="PackedScene" uid="uid://d0fccyec7fdv8" path="res://Train.tscn" id="3_vvh5c"]
-[ext_resource type="PackedScene" uid="uid://c18hkxq8jxept" path="res://track-bend.tscn" id="5_jnlp7"]
+
+[sub_resource type="Curve3D" id="Curve3D_28aoi"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 5, 0, 0, -4.5, -2, 0, -1.7, 0, 0, 0, 4.5, 0, 3),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
 
 [sub_resource type="Curve3D" id="Curve3D_jnlp7"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 2, 0, 0, -4.5, 0, 0, -2, 0, 0, 0, 0, 15, 4.5),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 5, 0, 0, -4.5, 0, 0, -5, 0, 0, 5, 0, 5, 4.5),
 "tilts": PackedFloat32Array(0, 0)
 }
 point_count = 2
@@ -16,38 +23,32 @@ point_count = 2
 [node name="Node3D" type="Node3D"]
 
 [node name="Hextile2" parent="." instance=ExtResource("2_pyidc")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 12)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5.19615)
 Texture = ExtResource("2_28aoi")
+Grid = ExtResource("3_jnlp7")
 
 [node name="Hextile" parent="." instance=ExtResource("2_pyidc")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18, 0, 5.19615)
 Texture = ExtResource("2_28aoi")
+Grid = ExtResource("3_jnlp7")
+X = 2
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(0.75631, -0.333994, 0.562532, -1.31143e-08, 0.859861, 0.510528, -0.654213, -0.386117, 0.650322, 4.70806, 3.87026, 7.39282)
 
+[node name="Track-straight3" parent="." instance=ExtResource("1_pq8q7")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.8235, 0, 35.2459)
+Curve = SubResource("Curve3D_28aoi")
+
 [node name="Track-straight" parent="." instance=ExtResource("1_pq8q7")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -11)
+transform = Transform3D(0.5, 0, -0.866025, 0, 1, 0, 0.866025, 0, 0.5, 9, 1, 0)
 Curve = SubResource("Curve3D_jnlp7")
 
-[node name="Train2" parent="." instance=ExtResource("3_vvh5c")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.5)
-
-[node name="Train" parent="." instance=ExtResource("3_vvh5c")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4.5)
-
-[node name="Train3" parent="." instance=ExtResource("3_vvh5c")]
-transform = Transform3D(0.996581, 0, 0.0826169, 0, 1, 0, -0.0826169, 0, 0.996581, 0.139705, 0, 9.3635)
-
-[node name="Train4" parent="." instance=ExtResource("3_vvh5c")]
-transform = Transform3D(0.541694, 0, 0.840576, 0, 1, 0, -0.840576, 0, 0.541694, 2.6398, 0, 13.4055)
-
-[node name="Track-bend" parent="." instance=ExtResource("5_jnlp7")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 12)
-
 [node name="Hextile3" parent="." instance=ExtResource("2_pyidc")]
-transform = Transform3D(0.5, 0, 0.866025, 0, 1, 0, -0.866025, 0, 0.5, 8.66559, -0.999999, 17.0127)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0, 0)
 Texture = ExtResource("2_28aoi")
+Grid = ExtResource("3_jnlp7")
+X = 1
 
 [node name="Track-straight2" parent="." instance=ExtResource("1_pq8q7")]
 transform = Transform3D(0.5, 0, 0.866025, 0, 1, 0, -0.866025, 0, 0.5, 8.66559, 9.53674e-07, 17.0127)
@@ -57,3 +58,10 @@ transform = Transform3D(0.5, 0, 0.866025, 0, 1, 0, -0.866025, 0, 0.5, 6.50053, 9
 
 [node name="Train6" parent="." instance=ExtResource("3_vvh5c")]
 transform = Transform3D(0.5, 0, 0.866025, 0, 1, 0, -0.866025, 0, 0.5, 10.8307, 9.53674e-07, 18.2627)
+
+[node name="Hextile4" parent="." instance=ExtResource("2_pyidc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0, 10.3923)
+Texture = ExtResource("2_28aoi")
+Grid = ExtResource("3_jnlp7")
+X = 1
+Y = 1

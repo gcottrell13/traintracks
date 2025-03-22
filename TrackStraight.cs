@@ -28,10 +28,7 @@ public partial class TrackStraight : Node3D
 	public const float DoubleRailBarSize = 0.2f;
 	public const float DoubleRailClip = 0.05f;
 
-	public const int SubdivideDepth = 3;
-
-	public const float MinZ = -4;
-	public const float MaxZ = 5;
+	public const int SubdivideDepth = 0;
 
 	public override void _Ready()
 	{
@@ -59,6 +56,7 @@ public partial class TrackStraight : Node3D
 		{
 			case TrackType.DoubleRail:
 				{
+					DoubleRailGeometry();
 					UpdateDoubleRailCurve();
 					break;
 				}
@@ -84,11 +82,20 @@ public partial class TrackStraight : Node3D
 		foreach (var child in TrackModel.GetChildren())
 			TrackModel.RemoveChild(child);
 
-		for (var i = MinZ; i <= MaxZ; i++)
+		float minZ = -4.5f;
+		float maxZ = 4.5f;
+
+		if (Curve != null)
+		{
+			minZ = 0;
+			maxZ = Curve.GetBakedLength();
+		}
+
+		for (var i = minZ; i <= maxZ; i++)
 		{
 			var part = CreateDoubleRailTrackPart();
 			TrackModel.AddChild(part);
-			part.TargetZ = i;
+			part.TargetZ = i + 0.5f;
 		}
 	}
 
@@ -109,13 +116,11 @@ public partial class TrackStraight : Node3D
 			//}
 			if (Curve == null)
 			{
-				part.SetDoubleTrailTransform3D(Transform3D.Identity);
+				part.Position = new Vector3(0, 0, part.TargetZ);
 			}
 			else
 			{
-				var s = (part.TargetZ - MinZ) / (MaxZ - MinZ);
-				var len = Curve.GetBakedLength();
-				part.SetDoubleTrailTransform3D(Curve.SampleBakedWithRotation(s * len, applyTilt: true));
+				part.SetDoubleTrailTransform3D(Curve.SampleBakedWithRotation(part.TargetZ, applyTilt: true));
 			}
 				
 		}
