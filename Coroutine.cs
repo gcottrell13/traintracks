@@ -134,7 +134,8 @@ public static class Timing
             else if (root.Key == node || root.Key.IsAncestorOf(node))
                 return root.Value.RunCoroutine(node, coroutine, name);
         }
-        throw new ApplicationException($"node {node.GetPath()} does not have an initialized {nameof(TreeTiming)}");
+        return default;
+        // throw new ApplicationException($"node {node.GetPath()} does not have an initialized {nameof(TreeTiming)}");
     }
 
     public static void StopCoroutine(CoroutineHandle handle)

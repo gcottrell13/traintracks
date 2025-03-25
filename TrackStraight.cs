@@ -19,7 +19,6 @@ public partial class TrackStraight : Node3D
 	[Export]
 	public TrackType TrackType { get => _trackType; set { _trackType = value; GenerateRailGeometry(); } }
 
-	private float? _lastCurveLength;
 	private Curve3D? _curve;
 	[Export]
 	public Curve3D? Curve { get => _curve; set { SetCurve(value); } }

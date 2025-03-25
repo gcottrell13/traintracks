@@ -9,8 +9,6 @@ script = ExtResource("1_l8v81")
 transform = Transform3D(0.997391, 0.0368568, -0.0620764, 0.0625215, -0.0110463, 0.997983, 0.0360967, -0.99926, -0.0133218, 8.7229, 13.8703, 5.9373)
 current = true
 
-[node name="OmniLight3D" type="OmniLight3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 23, 5)
-light_energy = 16.0
-shadow_enabled = true
-omni_range = 51.337
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -0.5, 0.866025, 0, -0.866025, -0.5, 0, 65.3339, 0)
+sky_mode = 1

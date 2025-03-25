@@ -1,12 +1,17 @@
-[gd_scene load_steps=7 format=3 uid="uid://d2yocfphkr8gk"]
+[gd_scene load_steps=9 format=3 uid="uid://d2yocfphkr8gk"]
 
 [ext_resource type="Script" uid="uid://k2lfc86cgeq1" path="res://Hextile.cs" id="1_h33nl"]
 [ext_resource type="Texture2D" uid="uid://lammq53fsx2b" path="res://icon.svg" id="2_3kqke"]
+[ext_resource type="Texture2D" uid="uid://esqtqyof1dqp" path="res://images/grass-hex-2-lg.png" id="2_h33nl"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i4bwl"]
+albedo_texture = ExtResource("2_h33nl")
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_3kqke"]
 radius = 6.0
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_3kqke"]
+material = SubResource("StandardMaterial3D_i4bwl")
 top_radius = 6.0
 bottom_radius = 6.0
 radial_segments = 6
@@ -22,6 +27,7 @@ orientation = 1
 
 [node name="Hextile" type="Node3D"]
 script = ExtResource("1_h33nl")
+Texture = SubResource("StandardMaterial3D_i4bwl")
 
 [node name="Area3D" type="Area3D" parent="."]
 monitoring = false
