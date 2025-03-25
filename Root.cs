@@ -93,6 +93,9 @@ public partial class Root : Node3D
 
 	public IEnumerable<Hextile> SetupTilesInGrid(int w, int h)
 	{
+		var grid = new HexGridProvider();
+		grid.GridType = GridType.OffsetEvenX;
+
 		for (var i = 0; i < w; i++)
 		{
 			for (var j = 0; j < h; j++)
@@ -100,7 +103,8 @@ public partial class Root : Node3D
 				var hextile = GD.Load<PackedScene>("res://hextile.tscn").Instantiate<Hextile>();
 				hextile.X = i;
 				hextile.Y = j;
-				hextile.Grid = GD.Load<HexGridProvider>("res://hexGridProvider-test.tres");
+				hextile.Grid = grid;
+				hextile.Size = 7;
 				hextile.Texture = MaterialCache.Images.GrassHexLg;
 				AddChild(hextile);
 				yield return hextile;
@@ -112,19 +116,27 @@ public partial class Root : Node3D
 	{
 		foreach (var tile in tiles)
 		{
-			for (var i = 0; i < 3; i++)
-			{
-				Timing.RunCoroutine(this, attach(tile, i, i + 3));
-			}
+			//for (var i = 0; i < 3; i++)
+			//{
+			//	Timing.RunCoroutine(this, attachNear(tile, i, i + 3));
+			//}
+
+			//for (var i = 0; i < 6; i++)
+			//{
+			//	Timing.RunCoroutine(this, attachNear(tile, i, i + 4));
+			//}
 
 			for (var i = 0; i < 6; i++)
 			{
-				Timing.RunCoroutine(this, attach(tile, i, i + 4));
+				Timing.RunCoroutine(this, attachFar(tile, i, i + 1));
+				Timing.RunCoroutine(this, attachFar(tile, i, i + 2));
+				Timing.RunCoroutine(this, attachFar(tile, i, i + 3));
+				Timing.RunCoroutine(this, attachFar(tile, i, i + 4));
 			}
 		}
 	}
 
-	public IEnumerator<float> attach(Hextile hex, int one1, int two2)
+	public IEnumerator<float> attachNear(Hextile hex, int one1, int two2)
 	{
 		if (hex.TryGetNearNeighbor(one1, out var hex1) && hex.TryGetNearNeighbor(two2, out var hex2))
 		{
@@ -138,6 +150,26 @@ public partial class Root : Node3D
 			curve.AddPoint(p1, @out: (hex.Position - p1) / 2);
 			curve.AddPoint(p2, @in: (hex.Position - p2) / 2);
 			t.SetCurve(curve);
+		}
+	}
+
+	public IEnumerator<float> attachFar(Hextile hex, int one1, int two2)
+	{
+		if (hex.TryGetNearNeighbor(one1, out var hex1))
+		{
+			if (hex.TryGetFarNeighbor(two2, out var hex22))
+			{
+				var t = new TrackStraight();
+				AddChild(t);
+				yield return 0.1f;
+				var curve = new Curve3D();
+				// t.Position = hex.Position + Vector3.Up;
+				var p1 = hex.GetNearNeighborSnapPoint(hex1);
+				var p2 = hex.GetNearNeighborSnapPoint(hex22);
+				curve.AddPoint(p1, @out: (hex.Position - p1) / 2);
+				curve.AddPoint(p2, @in: (hex.Position - p2) / 2);
+				t.SetCurve(curve);
+			}
 		}
 	}
 

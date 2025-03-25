@@ -8,57 +8,42 @@ namespace traintracks;
 [Tool]
 public partial class Hextile : Node3D, IClickable
 {
-	private static readonly float sqrt_3_over_2 = Mathf.Sqrt(3) / 2;
+    public static readonly IReadOnlyList<int> ConnectableNearNeighborRelativeIndexesFromNear = [2, 3, 4];
+    public static readonly IReadOnlyList<int> ConnectableNearNeighborRelativeIndexesFromFar = [2, 3, 4, 5];
+    public static readonly IReadOnlyList<int> ConnectableFarNeighborRelativeIndexesFromNear = [1, 2, 3, 4];
+    public static readonly IReadOnlyList<int> ConnectableFarNeighborRelativeIndexesFromFar = [2, 3, 4];
+
+    private static readonly float sqrt_3_over_2 = Mathf.Sqrt(3) / 2;
 
 	private Area3D collisionArea;
 
-	private static readonly Shape3D ShapecastShape = new SphereShape3D() { Radius = 0.5f };
 	private static readonly CylinderShape3D Area3DShape = new CylinderShape3D();
 
 	public Hextile()
 	{
-		for (var i = 0; i < 6; i++)
-		{
-			var close = new CustomShapecast3D(i, new ShapeCast3D()
-			{
-				Enabled = true,
-				Shape = ShapecastShape,
-				ExcludeParent = true,
-				CollideWithAreas = true,
-				CollideWithBodies = false,
-				Visible = true,
-			})
-			{
-				SideNum = i + 0.5f,
-				RadiusCoefficient = 1 / sqrt_3_over_2,
-			};
-			AddChild(close.Shape);
-			CloseShapecasts.Add(close);
-		}
-
 		collisionArea = new Area3D();
 		AddChild(collisionArea);
 		collisionArea.AddChild(new CollisionShape3D() { Shape = Area3DShape });
-	}
 
-	public readonly List<CustomShapecast3D> CloseShapecasts = [];
+		if (Engine.IsEditorHint() && FindChildren("label", owned: false).Count == 0)
+		{
+			AddChild(new Label3D()
+			{
+				Name="label",
+				Billboard=BaseMaterial3D.BillboardModeEnum.Enabled,
+				Text="HEX",
+				Scale=new(10, 10, 10),
+				Position=new(0, 5, 0),
+			});
+		}
+	}
 
 	public override void _Ready()
 	{
 		if (!Engine.IsEditorHint())
 		{
-			var area3d = GetNode<Area3D>("Area3D");
-			area3d.InputEvent += input_event;
+			collisionArea.InputEvent += input_event;
 		}
-		FindNeighbors();
-	}
-
-	public class CustomShapecast3D(int id, ShapeCast3D shape)
-	{
-		public ShapeCast3D Shape = shape;
-		public float SideNum;
-		public float RadiusCoefficient = 1;
-		public int Id { get; private set; } = id;
 	}
 
 	private float _size = 6;
@@ -83,8 +68,6 @@ public partial class Hextile : Node3D, IClickable
 	[Export]
 	public int Y { get => _y; set { UpdateGrid(_grid, X, value); } }
 
-	public DefaultDictionary<int, List<Hextile>> Neighbors = new(() => []);
-
 	private MeshInstance3D? _hexagon;
 	private MeshInstance3D? Hexagon {
 		get
@@ -100,8 +83,6 @@ public partial class Hextile : Node3D, IClickable
 	{
 		_size = Mathf.Max(size, 6);
 		var collisionRadius = size * sqrt_3_over_2;
-
-		PutShapecastsInPosition(collisionRadius);
 		Area3DShape.Radius = size;
 		if (Hexagon?.Mesh is CylinderMesh c)
 		{
@@ -109,7 +90,6 @@ public partial class Hextile : Node3D, IClickable
 			c.BottomRadius = size;
 			Hexagon.Rotation = new (0, Mathf.Pi / 6, 0);
 		}
-		CallDeferred(nameof(FindNeighbors));
 	}
 
 	private void Updated() => UpdateGrid(Grid, X, Y);
@@ -118,6 +98,10 @@ public partial class Hextile : Node3D, IClickable
 		_grid = grid;
 		_x = x;
 		_y = y;
+
+		Name = $"Hextile_{x}_{y}";
+		if (FindChild("label", owned: false) is Label3D label)
+			label.Text = $"{x}, {y}";
 
 		// ================================================================
 		// ================================================================
@@ -137,30 +121,38 @@ public partial class Hextile : Node3D, IClickable
 		Hexagon.Mesh.SurfaceSetMaterial(0, texture);
 	}
 
-	private void FindNeighbors()
-	{
-		Neighbors.Clear();
-		foreach (var shapecast in CloseShapecasts)
-		{
-			var neighbors = GetNeighbors(shapecast.Shape).ToList();
-			Neighbors[shapecast.Id] = neighbors;
-			shapecast.Shape.DebugShapeCustomColor = neighbors.Count switch
-			{
-				1 => new Color(0, 1, 0),
-				2 => new Color(1, 1, 1),
-				_ => new Color(0, 0, 0),
-			};
-		}
-	}
-
 	public Hextile? GetNearNeighbor(int i)
 	{
-		return Neighbors[Mathf.PosMod(i, 6)].Intersect(Neighbors[Mathf.PosMod(i - 1, 6)]).FirstOrDefault();
+		if (Grid?.GetNeighborCoordinate(X, Y, Mathf.PosMod(i, 6)) is not Vector2 p)
+			return null;
+		var name = $"Hextile_{p.X}_{p.Y}";
+		return GetParent().GetChildrenByType<Hextile>().FirstOrDefault(x => x.Name == name);
 	}
 
 	public bool TryGetNearNeighbor(int i, [MaybeNullWhen(false)] out Hextile neighbor)
 	{
 		if (GetNearNeighbor(i) is Hextile hex)
+		{
+			neighbor = hex;
+			return true;
+		}
+		neighbor = null;
+		return false;
+	}
+
+	public Hextile? GetFarNeighbor(int i)
+	{
+		if (GetNearNeighbor(i) == null || GetNearNeighbor(i + 1) == null)
+			return null;
+		if (Grid?.GetNeighborCoordinate(X, Y, Mathf.PosMod(i, 6) + 6) is not Vector2 p)
+			return null;
+		var name = $"Hextile_{p.X}_{p.Y}";
+		return GetParent().GetChildrenByType<Hextile>().FirstOrDefault(x => x.Name == name);
+	}
+
+	public bool TryGetFarNeighbor(int i, [MaybeNullWhen(false)] out Hextile neighbor)
+	{
+		if (GetFarNeighbor(i) is Hextile hex)
 		{
 			neighbor = hex;
 			return true;
@@ -176,33 +168,6 @@ public partial class Hextile : Node3D, IClickable
 	/// <returns></returns>
 	public Vector3 GetNearNeighborSnapPoint(Hextile neighbor) => (neighbor.Position + Position) / 2;
 
-	private IEnumerable<Hextile> GetNeighbors(ShapeCast3D shapecast)
-	{
-		if (!shapecast.IsInsideTree())
-			yield break;
-
-		shapecast.ForceShapecastUpdate();
-		var count = shapecast.GetCollisionCount();
-		for (var i = 0; i < count; i++)
-		{
-			var collision = shapecast.GetCollider(i);
-			if (collision is Area3D area && area.GetParent() is Hextile hex && hex != this)
-			{
-				yield return hex;
-			}
-		}
-	}
-
-	private void PutShapecastsInPosition(float radius)
-	{
-		var f = 2 * Mathf.Pi / 6;
-		foreach (var shapecast in CloseShapecasts)
-		{
-			shapecast.Shape.Position = new Vector3(Mathf.Sin(shapecast.SideNum * f), 0, Mathf.Cos(shapecast.SideNum * f)) * radius * shapecast.RadiusCoefficient;
-			shapecast.Shape.TargetPosition = Vector3.Zero;
-			shapecast.Shape.Owner = this;
-		}
-	}
 
 	#region Click
 	public void input_event(Node camera, InputEvent @event, Vector3 eventPosition, Vector3 normal, long shapeIdx)

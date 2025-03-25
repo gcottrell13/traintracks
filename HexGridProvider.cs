@@ -1,5 +1,7 @@
 ﻿using Godot;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Drawing;
 
 namespace traintracks;
@@ -90,4 +92,43 @@ public partial class HexGridProvider : Resource
         var rot = Transform3D.Identity.RotatedLocal(Vector3.Up, (float)Math.PI / 2);
         return Transform.TranslatedLocal(new Vector3(xx, 0, yy)) * rot;
     }
+
+    private static Vector2[] NeighborsOffsetOddX = [
+
+            new(0, -1),
+            new(1, 0),
+            new(1, 1),
+            new(0, 1),
+            new(-1, 1),
+            new(-1, 0),
+
+            new(1, -1),
+            new(2, 0),
+            new(1, 2),
+            new(-1, 2),
+            new(-2, 0),
+            new(-1, -1),
+        ];
+
+    private static Vector2[] NeighborsOffsetEvenX = [
+            new(0, -1),
+            new(1, -1),
+            new(1, 0),
+            new(0, 1),
+            new(-1, 0),
+            new(-1, -1),
+            new(1, -2),
+            new(2, 0),
+            new(1, 1),
+            new(-1, 1),
+            new(-2, 0),
+            new(-1, -2),
+        ];
+
+    public Vector2 GetNeighborCoordinate(int x, int y, int index) => g switch
+    {
+        GridType.OffsetEvenX => Mathf.PosMod(x, 2) == 1 ? NeighborsOffsetEvenX[index] : NeighborsOffsetOddX[index],
+        GridType.OffsetOddX => Mathf.PosMod(x, 2) == 1 ? NeighborsOffsetOddX[index] : NeighborsOffsetEvenX[index],
+        _ => throw new NotImplementedException(),
+    } + new Vector2(x, y);
 }

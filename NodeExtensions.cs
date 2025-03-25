@@ -17,8 +17,8 @@ public static class NodeExtensions
                 yield return t;
     }
 
-    public static T FindChild<T>(this Node node, string name, bool recursive = true) where T : Node 
-        => node.FindChild(name, recursive) is T t ? t : throw new NullReferenceException($"Attempt to find child {name} - {node.GetPath().GetConcatenatedNames()}");
+    //public static T? FindChild<T>(this Node node, string name, bool recursive = true) where T : Node 
+    //    => node.FindChild(name, recursive) is T t ? t : null;
 
     public static CancellationTokenSource CallAsync(this Node node, Func<CancellationToken, Task> fn)
     {
