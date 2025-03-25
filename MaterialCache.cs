@@ -29,7 +29,14 @@ public static class MaterialCache
 
     public static class Images
     {
-        public readonly static Material TrainTrackUV1 = GetMaterial(ResourceLoader.Load<Texture2D>("res://images/traintrack-uv1.png"));
+        public readonly static ShaderMaterial TrainTrackUV1 = SetShaderParams(
+            new ShaderMaterial() { Shader = ResourceLoader.Load<Shader>("res://models/doubleRail.gdshader") },
+            new() {
+                { "texture_albedo", ResourceLoader.Load<Texture2D>("res://images/traintrack-uv1.png") } ,
+                { "albedo", Vector4.One },
+                { "uv1_scale", Vector3.One },
+            }
+        );
         public readonly static ShaderMaterial TrainTrackUV2 = SetShaderParams(
             new ShaderMaterial() { Shader = ResourceLoader.Load<Shader>("res://models/doubleRail.gdshader") },
             new() { 
@@ -37,6 +44,8 @@ public static class MaterialCache
                 { "albedo", Vector4.One },
                 { "uv1_scale", Vector3.One },
             }
-            );
+        );
+
+        public readonly static StandardMaterial3D GrassHexLg = GetMaterial(GD.Load<Texture2D>("res://images/grass-hex-2-lg.png"));
     }
 }

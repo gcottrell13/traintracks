@@ -54,15 +54,12 @@ public partial class HexGridProvider : Resource
     GridType g = GridType.OffsetEvenX;
 
     [Export]
-    public Transform3D Transform { get => t; set { t = value; OnUpdated?.Invoke(); } }
+    public Transform3D Transform { get => t; set { t = value; EmitChanged(); } }
 
     [Export]
-    public GridType GridType { get => g; set { g = value; OnUpdated?.Invoke(); } }
+    public GridType GridType { get => g; set { g = value; EmitChanged(); } }
 
     private static readonly float sqrt_3 = (float)Math.Sqrt(3);
-
-    public delegate void Updated();
-    public event Updated? OnUpdated;
 
     public Transform3D GetGridTransform(float size, int x, int y)
     {

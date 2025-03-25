@@ -5,6 +5,5 @@
 [resource]
 script = ExtResource("1_0eedj")
 Transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
-Size = 6.0
 GridType = 1
 metadata/_custom_type_script = "uid://daa1dtl068ybo"

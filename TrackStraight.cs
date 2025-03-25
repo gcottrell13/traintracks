@@ -1,4 +1,6 @@
 using Godot;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace traintracks;
 
@@ -22,31 +24,24 @@ public partial class TrackStraight : Node3D
 	[Export]
 	public Curve3D? Curve { get => _curve; set { SetCurve(value); } }
 
-	private Node3D? TrackModel => (Node3D)FindChild("track");
+	private Node3D TrackModel = new Node3D();
 
 	public const float DoubleRailSize = 0.2f;
 	public const float DoubleRailBarSize = 0.2f;
 	public const float DoubleRailClip = 0.05f;
 
+	private CoroutineHandle GenerationCoroutine;
+
 	public const int SubdivideDepth = 0;
 
 	public override void _Ready()
 	{
-		base._Ready();
+		AddChild(TrackModel);
 		GenerateRailGeometry();
 	}
 
 	public override void _Process(double delta)
 	{
-		base._Process(delta);
-
-		var newCurve = Curve?.GetBakedLength();
-
-		if (newCurve != _lastCurveLength)
-		{
-			SetCurve(Curve);
-			_lastCurveLength = newCurve;
-		}
 	}
 
 	public void SetCurve(Curve3D? curve)
@@ -57,7 +52,6 @@ public partial class TrackStraight : Node3D
 			case TrackType.DoubleRail:
 				{
 					DoubleRailGeometry();
-					UpdateDoubleRailCurve();
 					break;
 				}
 		}
@@ -77,52 +71,83 @@ public partial class TrackStraight : Node3D
 
 	private void DoubleRailGeometry()
 	{
-		if (TrackModel == null)
-			return;
-		foreach (var child in TrackModel.GetChildren())
-			TrackModel.RemoveChild(child);
+		Timing.StopCoroutine(GenerationCoroutine);
+		GenerationCoroutine = Timing.RunCoroutine(this, GenerateDoubleRailAsync());
+	}
+
+	public IEnumerator<float> GenerateDoubleRailAsync()
+	{
+		// return;
+		if (Curve == null)
+			yield break;
 
 		float minZ = -4.5f;
 		float maxZ = 4.5f;
 
-		if (Curve != null)
+		if (Curve.PointCount < 2)
+			yield break;
+		minZ = 0;
+		maxZ = Curve.GetBakedLength();
+
+		if (maxZ < 1)
+			yield break;
+
+		yield return 0.1f;
+
+		var fractional = maxZ % 1.0f;
+		var partCount = Mathf.Abs(maxZ) + Mathf.Abs(minZ);
+		if (fractional > 0.5)
 		{
-			minZ = 0;
-			maxZ = Curve.GetBakedLength();
+			fractional = -fractional;
+			maxZ += 0.25f;
 		}
 
-		for (var i = minZ; i <= maxZ; i++)
+		var existingParts = GetDoubleRailParts().GetEnumerator();
+		for (var i = minZ; i <= (int)maxZ; i += 1 + (fractional / partCount))
 		{
-			var part = CreateDoubleRailTrackPart();
-			TrackModel.AddChild(part);
+			var part = existingParts.MoveNext() ? existingParts.Current : CreateDoubleRailTrackPart();
 			part.TargetZ = i + 0.5f;
+			if (part.GetParent() == null)
+			{
+				TrackModel.AddChild(part);
+				UpdateDoubleRailCurve();
+				yield return 0.05f;
+			}
+		}
+		while (existingParts.MoveNext())
+		{
+			TrackModel.RemoveChild(existingParts.Current);
 		}
 	}
 
 	private void UpdateDoubleRailCurve()
 	{
-		if (TrackModel == null)
-			return;
-
-		foreach (var child in TrackModel.GetChildren())
+		foreach (var part in GetDoubleRailParts())
 		{
-			if (child is not DoubleRailTrackPart part)
-				continue;
-			//var step = 1.0f / SubdivideDepth;
-
-			//for (var f = -0.5f; f <= 0.5f; f += step)
-			//{
-
-			//}
 			if (Curve == null)
 			{
 				part.Position = new Vector3(0, 0, part.TargetZ);
 			}
-			else
+			else if (part.TargetZ <= Curve.GetBakedLength())
 			{
 				part.SetDoubleTrailTransform3D(Curve.SampleBakedWithRotation(part.TargetZ, applyTilt: true));
 			}
+			else
+			{
+				part.GetParent()?.RemoveChild(part);
+			}
 				
+		}
+	}
+
+	private IEnumerable<DoubleRailTrackPart> GetDoubleRailParts()
+	{
+		foreach (var child in TrackModel.GetChildren())
+		{
+			if (child is DoubleRailTrackPart part)
+				yield return part;
+			else
+				TrackModel.RemoveChild(child);
 		}
 	}
 
@@ -136,7 +161,8 @@ public partial class TrackStraight : Node3D
 				Size = new(2.5f, DoubleRailBarSize, DoubleRailBarSize),
 				Material = MaterialCache.Images.TrainTrackUV1,
 			},
-			Position = new(0, DoubleRailBarSize / 2 - 0.05f, 0)
+			Position = new(0, DoubleRailBarSize / 2 - 0.05f, 0),
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
 		};
 		var leftRailMesh = new MeshInstance3D()
 		{
@@ -148,6 +174,7 @@ public partial class TrackStraight : Node3D
 				Material = MaterialCache.Images.TrainTrackUV2,
 			}, 
 			Position = new(1, barMesh.Position.Y + DoubleRailSize - DoubleRailClip, 0),
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
 		};
 		var rightRailMesh = new MeshInstance3D
 		{
@@ -158,8 +185,13 @@ public partial class TrackStraight : Node3D
 				Size = new(DoubleRailSize, DoubleRailSize, 1),
 				Material = MaterialCache.Images.TrainTrackUV2,
 			},
-			Position = new(-1, leftRailMesh.Position.Y, 0)
+			Position = new(-1, leftRailMesh.Position.Y, 0),
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
 		};
+		rightRailMesh.SetInstanceShaderParameter("start_time", Root.time);
+		leftRailMesh.SetInstanceShaderParameter("start_time", Root.time);
+		barMesh.SetInstanceShaderParameter("start_time", Root.time);
+
 		return new DoubleRailTrackPart().SetMeshes(leftRailMesh, rightRailMesh, barMesh);
 	}
 
@@ -184,7 +216,7 @@ public partial class TrackStraight : Node3D
 		public void SetDoubleTrailTransform3D(Transform3D transform)
 		{
 			Transform = transform;
-
+			Position += Vector3Helpers.RandomJitter(Position.Z);
 		}
 	}
 }

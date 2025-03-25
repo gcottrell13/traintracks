@@ -3,6 +3,11 @@
 shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_schlick_ggx;
 
+instance uniform float start_time;
+global uniform vec4 TrackBuildColor;
+global uniform float TrackBuildFadeTime;
+global uniform float GlobalTime;
+
 uniform vec4 albedo : source_color;
 uniform sampler2D texture_albedo : source_color, filter_linear_mipmap, repeat_enable;
 uniform ivec2 albedo_texture_size;
@@ -39,4 +44,10 @@ void fragment() {
 	vec4 roughness_texture_channel = vec4(1.0, 0.0, 0.0, 0.0);
 	float roughness_tex = dot(texture(texture_roughness, base_uv), roughness_texture_channel);
 	ROUGHNESS = roughness_tex * roughness;
+
+	if (GlobalTime - start_time < TrackBuildFadeTime) {
+		float start_color_intensity = (GlobalTime - start_time) / TrackBuildFadeTime;
+		ALBEDO = mix(TrackBuildColor.xyz, ALBEDO, pow(start_color_intensity, 3));
+		EMISSION = TrackBuildColor.xyz * (1.0 - start_color_intensity);
+	}
 }

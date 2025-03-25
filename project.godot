@@ -28,3 +28,22 @@ project/assembly_name="traintracks"
 folder_colors={
 "res://images/": "orange"
 }
+
+[rendering]
+
+limits/global_shader_variables/buffer_size=655360
+
+[shader_globals]
+
+TrackBuildColor={
+"type": "color",
+"value": Color(0.882353, 0.486275, 0, 1)
+}
+TrackBuildFadeTime={
+"type": "float",
+"value": 2.0
+}
+GlobalTime={
+"type": "float",
+"value": 0.0
+}
