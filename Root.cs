@@ -1,18 +1,31 @@
 using Godot;
 using System.Collections.Generic;
+using System.Linq;
 
 
 namespace traintracks;
 
 
-[Tool]
 public partial class Root : Node3D
 {
 	public static double time;
+	public readonly OrbitCamera3D Camera;
+
+	public Root()
+	{
+		Camera = new()
+		{
+			Distance = 10,
+			AngleHeight = Mathf.Pi / 4,
+		};
+
+		AddChild(Camera);
+	}
 
 	public override void _EnterTree()
 	{
 		AddChild(Timing.CreateTree(this));
+		Camera.Current = true;
 	}
 
 	public override void _ExitTree()
@@ -28,20 +41,25 @@ public partial class Root : Node3D
 
 	public override void _Ready()
 	{
-		//Timing.RunCoroutine(this, SetupGrid(3, 3));
-		Timing.RunCoroutine(this, SetupRandomWalk(20));
+		Timing.RunCoroutine(this, SetupTilesInGrid(10, 10));
+		//Timing.RunCoroutine(this, SetupRandomWalk(20));
 		//Timing.RunCoroutine(this, attach("Hextile2", 2, 4));
 	}
 
 	public IEnumerator<float> SetupRandomWalk(int length)
 	{
-		var tiles = SetupTilesRandomWalk(length);
+		var tiles = SetupTilesRandomWalk(length).ToList();
 		yield return 0.1f;
-		PlaceTracks(tiles);
 	}
 
 	public IEnumerable<Hextile> SetupTilesRandomWalk(int length)
 	{
+		var grid = new HexGridProvider
+		{
+			GridType = GridType.OffsetEvenX,
+			Transform = Transform3D.Identity,
+		};
+		
 		var rng = new RandomNumberGenerator();
 
 		var pos = new Vector2(0, 0);
@@ -73,41 +91,46 @@ public partial class Root : Node3D
 
 			pos = availablePositions[rng.RandiRange(0, availablePositions.Count - 1)];
 
-			var hextile = GD.Load<PackedScene>("res://hextile.tscn").Instantiate<Hextile>();
-			hextile.X = (int)pos.X;
-			hextile.Y = (int)pos.Y;
-			hextile.Grid = GD.Load<HexGridProvider>("res://hexGridProvider-test.tres");
-			hextile.Texture = MaterialCache.Images.GrassHexLg;
+			var hextile = new Hextile
+			{
+				X = (int)pos.X,
+				Y = (int)pos.Y,
+				Grid = grid,
+				Texture = MaterialCache.Images.HexTile.GrassLg,
+			};
 			tiles[pos] = hextile;
 			AddChild(hextile);
 		}
 		return tiles.Values;
 	}
 
-	public IEnumerator<float> SetupGrid(int w, int h)
+	public IEnumerator<float> SetupTilesInGrid(int w, int h)
 	{
-		var tiles = SetupTilesInGrid(w, h);
-		yield return 0.1f;
-		PlaceTracks(tiles);
-	}
-
-	public IEnumerable<Hextile> SetupTilesInGrid(int w, int h)
-	{
-		var grid = new HexGridProvider();
-		grid.GridType = GridType.OffsetEvenX;
+		var grid = new HexGridProvider
+		{
+			GridType = GridType.OffsetEvenX,
+		};
 
 		for (var i = 0; i < w; i++)
 		{
 			for (var j = 0; j < h; j++)
 			{
-				var hextile = GD.Load<PackedScene>("res://hextile.tscn").Instantiate<Hextile>();
-				hextile.X = i;
-				hextile.Y = j;
-				hextile.Grid = grid;
-				hextile.Size = 7;
-				hextile.Texture = MaterialCache.Images.GrassHexLg;
+				var hextile = new Hextile
+				{
+					X = i - w / 2,
+					Y = j - h / 2,
+					Grid = grid,
+					Texture = MaterialCache.Images.HexTile.GrassLg,
+				};
+				GD.Print($"{hextile} - {hextile.Position}");
 				AddChild(hextile);
-				yield return hextile;
+				yield return 0.01f;
+
+
+				for (var k = 0; k < 3; k++)
+				{
+					Timing.RunCoroutine(this, attachNear(hextile, k, k + 3));
+				}
 			}
 		}
 	}
@@ -116,67 +139,87 @@ public partial class Root : Node3D
 	{
 		foreach (var tile in tiles)
 		{
-			//for (var i = 0; i < 3; i++)
-			//{
-			//	Timing.RunCoroutine(this, attachNear(tile, i, i + 3));
-			//}
+			for (var i = 0; i < 3; i++)
+			{
+				Timing.RunCoroutine(this, attachNear(tile, i, i + 3));
+			}
 
 			//for (var i = 0; i < 6; i++)
 			//{
 			//	Timing.RunCoroutine(this, attachNear(tile, i, i + 4));
 			//}
 
-			for (var i = 0; i < 6; i++)
-			{
-				Timing.RunCoroutine(this, attachFar(tile, i, i + 1));
-				Timing.RunCoroutine(this, attachFar(tile, i, i + 2));
-				Timing.RunCoroutine(this, attachFar(tile, i, i + 3));
-				Timing.RunCoroutine(this, attachFar(tile, i, i + 4));
-			}
+			//for (var i = 0; i < 6; i++)
+			//{
+			//	Timing.RunCoroutine(this, attachFar(tile, i, i + 1));
+			//	Timing.RunCoroutine(this, attachFar(tile, i, i + 2));
+			//	Timing.RunCoroutine(this, attachFar(tile, i, i + 3));
+			//	Timing.RunCoroutine(this, attachFar(tile, i, i + 4));
+			//}
 		}
 	}
 
 	public IEnumerator<float> attachNear(Hextile hex, int one1, int two2)
 	{
-		if (hex.TryGetNearNeighbor(one1, out var hex1) && hex.TryGetNearNeighbor(two2, out var hex2))
-		{
-			var t = new TrackStraight();
-			AddChild(t);
-			yield return 0.1f;
-			var curve = new Curve3D();
-			// t.Position = hex.Position + Vector3.Up;
-			var p1 = hex.GetNearNeighborSnapPoint(hex1);
-			var p2 = hex.GetNearNeighborSnapPoint(hex2);
-			curve.AddPoint(p1, @out: (hex.Position - p1) / 2);
-			curve.AddPoint(p2, @in: (hex.Position - p2) / 2);
-			t.SetCurve(curve);
-		}
+		hex.AddTrack(new(0, (byte)one1, HextileConnectionType.Near), new(0, (byte)two2, HextileConnectionType.Near), TrackDisplayType.Ghost);
+		yield return 0.1f;
 	}
 
-	public IEnumerator<float> attachFar(Hextile hex, int one1, int two2)
+	public bool DidMoveFromRightClick = false;
+
+	public override void _Input(InputEvent @event)
 	{
-		if (hex.TryGetNearNeighbor(one1, out var hex1))
+		if (Engine.IsEditorHint())
+			return;
+		if (@event is InputEventMouseMotion mouseMotion)
 		{
-			if (hex.TryGetFarNeighbor(two2, out var hex22))
+			if (!mouseMotion.Relative.IsZeroApprox() && Input.IsMouseButtonPressed(MouseButton.Right))
 			{
-				var t = new TrackStraight();
-				AddChild(t);
-				yield return 0.1f;
-				var curve = new Curve3D();
-				// t.Position = hex.Position + Vector3.Up;
-				var p1 = hex.GetNearNeighborSnapPoint(hex1);
-				var p2 = hex.GetNearNeighborSnapPoint(hex22);
-				curve.AddPoint(p1, @out: (hex.Position - p1) / 2);
-				curve.AddPoint(p2, @in: (hex.Position - p2) / 2);
-				t.SetCurve(curve);
+				Camera.AngleAround -= mouseMotion.Relative.X * 0.01f;
+				Camera.AngleHeight = Mathf.Clamp(Camera.AngleHeight + mouseMotion.Relative.Y * 0.01f, Mathf.Pi / 8, 1.5f);
+				DidMoveFromRightClick = true;
+			}
+		}
+		else if (@event is InputEventMouseButton mouseButton)
+		{
+			switch (mouseButton.ButtonIndex)
+			{
+				case MouseButton.WheelDown or MouseButton.WheelUp:
+					{
+						var dir = mouseButton.ButtonIndex == MouseButton.WheelDown ? 1 : -1;
+						if (Camera.Projection == Camera3D.ProjectionType.Perspective)
+						{
+							Camera.Distance = Mathf.Clamp(Camera.Distance + mouseButton.Factor * dir, 10, 300);
+						}
+						else if (Camera.Projection == Camera3D.ProjectionType.Orthogonal)
+						{
+							Camera.Size = Mathf.Clamp(Camera.Size + dir * mouseButton.Factor, 10, 500);
+						}
+
+						break;
+					}
+				case MouseButton.Right:
+					{
+						if (mouseButton.IsReleased())
+						{
+							if (DidMoveFromRightClick)
+								DidMoveFromRightClick = false;
+							else
+							{ /* cancel current action */ }
+						}
+						break;
+					}
 			}
 		}
 	}
 
 	public override void _UnhandledInput(InputEvent @event)
 	{
-		base._UnhandledInput(@event);
-		if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Left) 
+		if (Engine.IsEditorHint())
+			return;
+		if (@event is InputEventMouseButton mouseButton && mouseButton.IsReleased() && mouseButton.ButtonIndex == MouseButton.Left)
+		{
 			GlobalClickHelper.WasClicked(null);
+		}
 	}
 }

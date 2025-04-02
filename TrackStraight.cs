@@ -1,6 +1,5 @@
 using Godot;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace traintracks;
 
@@ -10,20 +9,27 @@ public enum TrackType
 	DoubleRail = 2,
 }
 
-[Tool]
+public enum TrackDisplayType
+{
+	Ghost,
+	Preview,
+	Normal,
+}
+
+
 public partial class TrackStraight : Node3D
 {
 
 	private TrackType _trackType = TrackType.DoubleRail;
+	public static readonly PackedScene ReiScene = GD.Load<PackedScene>("res://RailExtendIndicator.tscn");
 
 	[Export]
 	public TrackType TrackType { get => _trackType; set { _trackType = value; GenerateRailGeometry(); } }
 
-	private Curve3D? _curve;
-	[Export]
-	public Curve3D? Curve { get => _curve; set { SetCurve(value); } }
+	private Curve3D Curve;
+	private TrackDisplayType DisplayType;
 
-	private Node3D TrackModel = new Node3D();
+    private Node3D TrackModel;
 
 	public const float DoubleRailSize = 0.2f;
 	public const float DoubleRailBarSize = 0.2f;
@@ -33,9 +39,18 @@ public partial class TrackStraight : Node3D
 
 	public const int SubdivideDepth = 0;
 
-	public override void _Ready()
+    private RailExtendIndicator? reiStart;
+    private RailExtendIndicator? reiBack;
+
+    public TrackStraight()
+    {
+        TrackModel = new Node3D();
+        AddChild(TrackModel);
+		Curve = new();
+    }
+
+    public override void _Ready()
 	{
-		AddChild(TrackModel);
 		GenerateRailGeometry();
 	}
 
@@ -43,9 +58,10 @@ public partial class TrackStraight : Node3D
 	{
 	}
 
-	public void SetCurve(Curve3D? curve)
+	public void SetCurve(Curve3D curve, TrackDisplayType displayType)
 	{
-		_curve = curve;
+		Curve = curve;
+		DisplayType = displayType;
 		switch (TrackType)
 		{
 			case TrackType.DoubleRail:
@@ -56,7 +72,46 @@ public partial class TrackStraight : Node3D
 		}
 	}
 
-	public void GenerateRailGeometry()
+	public void SetExtensionIndicator(bool atStart, bool atback)
+    {
+        if (reiStart != null)
+        {
+            RemoveChild(reiStart);
+            reiStart = null;
+        }
+        if (reiBack != null)
+        {
+            RemoveChild(reiBack);
+            reiBack = null;
+        }
+
+        if (atStart)
+        {
+            reiStart = ReiScene.Instantiate<RailExtendIndicator>();
+			reiStart.Name = $"{Name}__Start";
+            var startPos = Curve.SampleBakedWithRotation(1);
+            reiStart.Transform = startPos.TranslatedLocal(Vector3.Up);
+			AddChild(reiStart);
+			reiStart.OnClick += click;
+        }
+        if (atback)
+        {
+            reiBack = ReiScene.Instantiate<RailExtendIndicator>();
+			reiBack.Name = $"{Name}__Back";
+            var startPos = Curve.SampleBakedWithRotation(Curve.GetBakedLength() - 1);
+            reiBack.Transform = startPos.RotatedLocal(Vector3.Up, Mathf.Pi).TranslatedLocal(Vector3.Up);
+			AddChild(reiBack);
+            reiBack.OnClick += click;
+        }
+    }
+
+	public void click(RailExtendIndicator node)
+	{
+		GD.Print($"Clicked on REI: {node.Name}");
+	}
+
+
+    public void GenerateRailGeometry()
 	{
 		switch (TrackType)
 		{
@@ -77,18 +132,13 @@ public partial class TrackStraight : Node3D
 	public IEnumerator<float> GenerateDoubleRailAsync()
 	{
 		// return;
-		if (Curve == null)
-			yield break;
-
-		float minZ = -4.5f;
-		float maxZ = 4.5f;
-
 		if (Curve.PointCount < 2)
 			yield break;
-		minZ = 0;
-		maxZ = Curve.GetBakedLength();
 
-		if (maxZ < 1)
+        float minZ = 0;
+        float maxZ = Curve.GetBakedLength();
+
+        if (maxZ < 1)
 			yield break;
 
 		yield return 0.1f;
@@ -110,7 +160,10 @@ public partial class TrackStraight : Node3D
 			{
 				TrackModel.AddChild(part);
 				UpdateDoubleRailCurve();
-				yield return 0.05f;
+
+				if (DisplayType == TrackDisplayType.Normal)
+					// only the normal display should do the animation of laying down track
+					yield return 0.05f;
 			}
 		}
 		while (existingParts.MoveNext())
@@ -123,11 +176,7 @@ public partial class TrackStraight : Node3D
 	{
 		foreach (var part in GetDoubleRailParts())
 		{
-			if (Curve == null)
-			{
-				part.Position = new Vector3(0, 0, part.TargetZ);
-			}
-			else if (part.TargetZ <= Curve.GetBakedLength())
+			if (part.TargetZ <= Curve.GetBakedLength())
 			{
 				part.SetDoubleTrailTransform3D(Curve.SampleBakedWithRotation(part.TargetZ, applyTilt: true));
 			}
@@ -150,7 +199,7 @@ public partial class TrackStraight : Node3D
 		}
 	}
 
-	private static DoubleRailTrackPart CreateDoubleRailTrackPart()
+	private DoubleRailTrackPart CreateDoubleRailTrackPart()
 	{
 		var barMesh = new MeshInstance3D
 		{
@@ -158,7 +207,6 @@ public partial class TrackStraight : Node3D
 			Mesh = new BoxMesh()
 			{
 				Size = new(2.5f, DoubleRailBarSize, DoubleRailBarSize),
-				Material = MaterialCache.Images.TrainTrackUV1,
 			},
 			Position = new(0, DoubleRailBarSize / 2 - 0.05f, 0),
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
@@ -170,7 +218,6 @@ public partial class TrackStraight : Node3D
 			{
 				SubdivideDepth = SubdivideDepth,
 				Size = new(DoubleRailSize, DoubleRailSize, 1),
-				Material = MaterialCache.Images.TrainTrackUV2,
 			}, 
 			Position = new(1, barMesh.Position.Y + DoubleRailSize - DoubleRailClip, 0),
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
@@ -182,17 +229,44 @@ public partial class TrackStraight : Node3D
 			{
 				SubdivideDepth = SubdivideDepth,
 				Size = new(DoubleRailSize, DoubleRailSize, 1),
-				Material = MaterialCache.Images.TrainTrackUV2,
 			},
 			Position = new(-1, leftRailMesh.Position.Y, 0),
 			CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
 		};
-		rightRailMesh.SetInstanceShaderParameter("start_time", Root.time);
-		leftRailMesh.SetInstanceShaderParameter("start_time", Root.time);
-		barMesh.SetInstanceShaderParameter("start_time", Root.time);
 
-		return new DoubleRailTrackPart().SetMeshes(leftRailMesh, rightRailMesh, barMesh);
+		if (DisplayType == TrackDisplayType.Normal)
+        {
+            rightRailMesh.Mesh.SurfaceSetMaterial(0, MaterialCache.Images.DoubleRailTrack.Rail_TimedGlow);
+            leftRailMesh.Mesh.SurfaceSetMaterial(0, MaterialCache.Images.DoubleRailTrack.Rail_TimedGlow);
+            barMesh.Mesh.SurfaceSetMaterial(0, MaterialCache.Images.DoubleRailTrack.Bar_TimedGlow);
+            rightRailMesh.SetInstanceShaderParameter("start_time", Root.time);
+            leftRailMesh.SetInstanceShaderParameter("start_time", Root.time);
+            barMesh.SetInstanceShaderParameter("start_time", Root.time);
+            Timing.RunCoroutine(this, SetNormalRailMaterialNonGlow(3, rightRailMesh.Mesh, MaterialCache.Images.DoubleRailTrack.Rail));
+            Timing.RunCoroutine(this, SetNormalRailMaterialNonGlow(3, leftRailMesh.Mesh, MaterialCache.Images.DoubleRailTrack.Rail));
+            Timing.RunCoroutine(this, SetNormalRailMaterialNonGlow(3, barMesh.Mesh, MaterialCache.Images.DoubleRailTrack.Bar));
+        }
+        else if (DisplayType == TrackDisplayType.Ghost)
+        {
+            rightRailMesh.Mesh.SurfaceSetMaterial(0, MaterialCache.Images.DoubleRailTrack.Ghost);
+            leftRailMesh.Mesh.SurfaceSetMaterial(0, MaterialCache.Images.DoubleRailTrack.Ghost);
+            barMesh.Mesh.SurfaceSetMaterial(0, MaterialCache.Images.DoubleRailTrack.Ghost);
+        }
+        else if (DisplayType == TrackDisplayType.Preview)
+        {
+            rightRailMesh.Mesh.SurfaceSetMaterial(0, MaterialCache.Images.DoubleRailTrack.Preview);
+            leftRailMesh.Mesh.SurfaceSetMaterial(0, MaterialCache.Images.DoubleRailTrack.Preview);
+            barMesh.Mesh.SurfaceSetMaterial(0, MaterialCache.Images.DoubleRailTrack.Preview);
+        }
+
+        return new DoubleRailTrackPart().SetMeshes(leftRailMesh, rightRailMesh, barMesh);
 	}
+
+	public IEnumerator<float> SetNormalRailMaterialNonGlow(float after, Mesh mesh, StandardMaterial3D material)
+	{
+		yield return after;
+		mesh.SurfaceSetMaterial(0, material);
+    }
 
 	private partial class DoubleRailTrackPart : Node3D
 	{

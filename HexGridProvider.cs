@@ -51,7 +51,7 @@ public enum GridType
 [Tool]
 public partial class HexGridProvider : Resource
 {
-    Transform3D t;
+    Transform3D t = Transform3D.Identity;
     float s;
     GridType g = GridType.OffsetEvenX;
 

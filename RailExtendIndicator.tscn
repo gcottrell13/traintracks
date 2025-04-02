@@ -1,0 +1,30 @@
+[gd_scene load_steps=6 format=3 uid="uid://rd3xbhi6p24"]
+
+[ext_resource type="Texture2D" uid="uid://cobrpyym0c5b7" path="res://images/rail-extend-indicator.png" id="1_tvbqs"]
+[ext_resource type="Script" uid="uid://bkn3rhcobbjb5" path="res://RailExtendIndicator.cs" id="1_xd0du"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_xd0du"]
+transparency = 1
+albedo_texture = ExtResource("1_tvbqs")
+emission_enabled = true
+emission = Color(0, 1, 1, 1)
+uv1_scale = Vector3(0.95, 0.95, 0.95)
+uv1_offset = Vector3(0.025, 0.025, 0.025)
+texture_filter = 0
+
+[sub_resource type="QuadMesh" id="QuadMesh_oc2m0"]
+material = SubResource("StandardMaterial3D_xd0du")
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_xd0du"]
+
+[node name="RailExtendIndicator" type="Node3D"]
+script = ExtResource("1_xd0du")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(-1, -5.08877e-08, -3.82137e-15, 0, -2.54438e-08, 1, -8.74228e-08, 0.582087, 4.37114e-08, 0, 0, 0)
+mesh = SubResource("QuadMesh_oc2m0")
+
+[node name="Area3D" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D"]
+shape = SubResource("BoxShape3D_xd0du")
