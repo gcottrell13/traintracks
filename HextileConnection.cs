@@ -1,10 +1,13 @@
-﻿using System;
+﻿using Godot;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 
 namespace traintracks;
 
 public enum HextileConnectionType
 {
+    // non-zero so that the default HextileConnection has zero type
     Near = 1,
     Far = 2,
 }
@@ -20,14 +23,16 @@ public enum HextileConnectionCheck
     HIT = Height | Index | Type,
 }
 
-public readonly struct HextileConnection(byte height, byte index, HextileConnectionType type)
+public readonly struct HextileConnection(int height, NeighborId index, HextileConnectionType type)
 {
-    public readonly byte Height = height;
-    public readonly byte Index = index;
+    public readonly int Height = height;
+    public readonly NeighborId Index = index;
     public readonly HextileConnectionType ConnectionType = type;
-    public readonly override int GetHashCode() => (int)ConnectionType + Index << 2 + Height << 4;
+
+    public readonly override int GetHashCode() => (int)ConnectionType + (Index.GetHashCode() << 3) + (Height << 6);
     public readonly override bool Equals([NotNullWhen(true)] object? obj)
         => obj is HextileConnection hc && hc.GetHashCode() == GetHashCode();
+
     public static bool operator ==(HextileConnection left, HextileConnection right)
     {
         return left.Equals(right);
@@ -37,22 +42,24 @@ public readonly struct HextileConnection(byte height, byte index, HextileConnect
     {
         return !(left == right);
     }
+
+    public readonly HextileConnection Opposite => new(Height, -Index, ConnectionType);
+
+    public override string ToString() => $"c{ConnectionType}_i{Index}_h{Height}_i{GetHashCode()}";
 }
 
-public readonly struct HextileConnectionDouble
+public readonly struct HextileConnectionDouble(HextileConnection one, HextileConnection two)
 {
-    public readonly HextileConnection One;
-    public readonly HextileConnection Two;
+    public readonly HextileConnection One = one;
+    public readonly HextileConnection Two = two;
 
-    public HextileConnectionDouble(HextileConnection one, HextileConnection two)
-    {
-        (One, Two) = one.GetHashCode() < two.GetHashCode() ? (One, Two) : (Two, One);
-    }
+    // these two are used purely to maintain the un-ordered-ness of this struct for equality testing purposes (like in dictionaries)
+    private readonly HextileConnection Lesser = one.GetHashCode() < two.GetHashCode() ? one : two;
+    private readonly HextileConnection Greater = one.GetHashCode() < two.GetHashCode() ? two : one;
 
-    public readonly override int GetHashCode()
-    {
-        return One.GetHashCode() << 8 + Two.GetHashCode();
-    }
+    public readonly override int GetHashCode() => (Lesser.GetHashCode() << 8) + Greater.GetHashCode();
+
+    public override string ToString() => $"{Lesser}V{Greater}h{GetHashCode()}";
 
     public readonly bool Has(HextileConnection hex, HextileConnectionCheck checkType = HextileConnectionCheck.HIT) 
         => ((checkType & HextileConnectionCheck.Height) == 0 || One.Height == hex.Height || Two.Height == hex.Height) 
@@ -64,6 +71,7 @@ public readonly struct HextileConnectionDouble
 
     public readonly override bool Equals([NotNullWhen(true)] object? obj)
      => obj is HextileConnectionDouble hc && hc.GetHashCode() == GetHashCode();
+
     public static bool operator ==(HextileConnectionDouble left, HextileConnectionDouble right)
     {
         return left.Equals(right);
@@ -73,4 +81,5 @@ public readonly struct HextileConnectionDouble
     {
         return !(left == right);
     }
+
 }

@@ -1,20 +1,25 @@
 ﻿using Godot;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace traintracks;
 
-public struct CoroutineHandle(Node root, Node node, IEnumerator<float> coroutine, string name, int id)
+public static class TimingHelper
 {
-    public readonly string Name = name;
-    private readonly int Id = id;
-    public readonly Node Root = root;
+    public static CoroutineHandle RunCoroutine(this Node node, IEnumerator<float> coroutine, [CallerArgumentExpression(nameof(coroutine))] string name = "")
+        => Timing.RunCoroutine(node, coroutine, name);
+}
+
+public struct CoroutineHandle(Node node, IEnumerator<float> coroutine, string name)
+{
+    public string Name { get; private set; } = name;
     public readonly Node Node = node;
-    private readonly IEnumerator<float> Coroutine = coroutine;
+    private IEnumerator<float> Coroutine = coroutine;
     public bool IsRunning { get; private set; } = false;
+
+    public readonly List<(IEnumerator<float> enumerator, string name)> ThenEnumerators { get; } = [];
 
     public readonly bool MoveNext(out float next)
     {
@@ -37,15 +42,28 @@ public struct CoroutineHandle(Node root, Node node, IEnumerator<float> coroutine
         IsRunning = false;
     }
 
-    public override string ToString()
-    {
-        return $"Coroutine[{Root}, {Node}, {Name}]";
-    }
+    public override readonly string ToString() => $"Coroutine[{Node}, {Name}]";
 
     //public override bool Equals([NotNullWhen(true)] object? obj)
     //{
     //    return obj is CoroutineHandle ch && ch.Id == Id && ch.Node == Node;
     //}
+
+    public readonly CoroutineHandle Then(IEnumerator<float> then, [CallerArgumentExpression(nameof(then))] string name ="")
+    {
+        ThenEnumerators.Add((then, name));
+        return this;
+    }
+
+    public CoroutineHandle ThenNext()
+    {
+        (Coroutine, Name) = ThenEnumerators[0];
+        ThenEnumerators.RemoveAt(0);
+        IsRunning = true;
+        return this;
+    }
+
+    public bool HasThenNext() => ThenEnumerators.Count > 0;
 }
 
 public partial class TreeTiming : Node
@@ -53,15 +71,10 @@ public partial class TreeTiming : Node
     private readonly List<(CoroutineHandle handle, double nextTime)> handles = [];
     public double Elapsed { get; private set; }
 
-    public Node Root;
-    public int count;
-
-    public CoroutineHandle RunCoroutine(Node node, IEnumerator<float> coroutine, string name)
+    public void RunCoroutine(CoroutineHandle handle)
     {
-        var handle = new CoroutineHandle(Root, node, coroutine, name, count++);
         handle.Start();
         handles.Add((handle, 0));
-        return handle;
     }
 
     public override void _Process(double delta)
@@ -73,16 +86,21 @@ public partial class TreeTiming : Node
         foreach (var pair in iter)
         {
             var (handle, nextTime) = pair;
-            if (!handle.Node.IsInsideTree() || (handle.Node != Root && !Root.IsAncestorOf(handle.Node)))
+            if (!handle.Node.IsInsideTree())
             {
+                handle.Stop();
             }
             else if (!handle.IsRunning)
             {
             }
-            else if (Elapsed >= nextTime)
+            else if (handle.Node.CanProcess() && Elapsed >= nextTime)
             {
                 if (handle.MoveNext(out float next))
                     handles.Add((handle, Elapsed + next));
+                else if (handle.HasThenNext())
+                    handles.Add((handle.ThenNext(), nextTime));
+                else
+                    handle.Stop();
             }
             else
             {
@@ -112,38 +130,63 @@ public static class Timing
 
     public static TreeTiming CreateTree(Node root)
     {
-        var tree = new TreeTiming
-        {
-            Root = root
-        };
+        var tree = new TreeTiming();
         Trees[root] = tree;
+        if (!root.IsInsideTree())
+        {
+            void onReady()
+            {
+                root.AddChild(tree);
+                root.Ready -= onReady;
+            }
+            root.Ready += onReady;
+        }
+        else
+            root.AddChild(tree);
         return tree;
-    }
-
-    public static void RemoveTree(Node root)
-    {
-        Trees.Remove(root);
     }
 
     public static CoroutineHandle RunCoroutine(Node node, IEnumerator<float> coroutine, [CallerArgumentExpression(nameof(coroutine))] string name = "")
     {
-        foreach (var root in Trees.ToList())
+        var handle = new CoroutineHandle(node, coroutine, name);
+        if (!node.IsInsideTree())
         {
-            if (!root.Key.IsInsideTree())
-                Trees.Remove(root.Key);
-            else if (root.Key == node || root.Key.IsAncestorOf(node))
-                return root.Value.RunCoroutine(node, coroutine, name);
+            void onReady()
+            {
+                _RunCoroutine(handle);
+                node.Ready -= onReady;
+            }
+            node.Ready += onReady;
+            return handle;
         }
-        return default;
-        // throw new ApplicationException($"node {node.GetPath()} does not have an initialized {nameof(TreeTiming)}");
+        _RunCoroutine(handle);
+        return handle;
+    }
+
+    private static void _RunCoroutine(CoroutineHandle handle)
+    {
+        var root = handle.Node.GetTree().Root.GetChild(0);
+        if (!Trees.TryGetValue(root, out var tree))
+        {
+            tree = CreateTree(root);
+        }
+        tree.RunCoroutine(handle);
     }
 
     public static void StopCoroutine(CoroutineHandle handle)
     {
         if (!handle.IsRunning)
             return;
-        if (!Trees.TryGetValue(handle.Root, out TreeTiming? tree))
-            throw new ArgumentException($"Could not find timing tree for node: {handle.Node.GetPath()}");
+
+        if (!handle.Node.IsInsideTree())
+        {
+            handle.Stop();
+            return;
+        }
+
+        var root = handle.Node.GetTree().Root.GetChild(0);
+        if (!Trees.TryGetValue(root, out TreeTiming? tree))
+            return;
         tree.StopCoroutine(handle);
     }
 }

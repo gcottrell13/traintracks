@@ -1,26 +1,28 @@
 using Godot;
+using Godot.NativeInterop;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-
+using System.Runtime.CompilerServices;
 namespace traintracks;
 
 
-public partial class Hextile : Node3D, IClickable, IMouseEnterable
+public partial class Hextile : Node3D, IClickable, IMouseEnterable, INode<Hextile, HextileConnection>
 {
 	public const int OPPOSITE = 3;
 	public const int CLOCKWISE = 1;
 
 	private Area3D collisionArea;
 
-	private static readonly CylinderShape3D Area3DShape = new CylinderShape3D();
+	private static readonly CylinderShape3D Area3DShape = new();
 
-    private readonly CylinderMesh hexMesh = new()
+    private static readonly CylinderMesh hexMesh = new()
     {
         RadialSegments = 6,
         Rings = 0,
     };
-    private readonly CylinderMesh clickedOnMesh = new()
+    private static readonly CylinderMesh clickedOnMesh = new()
     {
         RadialSegments = 6,
         Rings = 0,
@@ -30,50 +32,7 @@ public partial class Hextile : Node3D, IClickable, IMouseEnterable
     private MeshInstance3D Hexagon;
 	private MeshInstance3D ClickedOnMarker;
 	private Dictionary<HextileConnectionDouble, TrackStraight> TrainTracks = [];
-
-	public Hextile()
-	{
-		collisionArea = new Area3D();
-		AddChild(collisionArea);
-		collisionArea.AddChild(new CollisionShape3D() { Shape = Area3DShape });
-
-		Hexagon = new MeshInstance3D()
-		{
-			Mesh = hexMesh,
-			RotationDegrees = new(0, 30, 0),
-			Position = new(0, -1, 0),
-		};
-		AddChild(Hexagon);
-
-		ClickedOnMarker = new MeshInstance3D()
-		{
-			Mesh = clickedOnMesh,
-			Visible = false,
-			RotationDegrees = new(0, 30, 0),
-			Position = new(0, 1, 0),
-		};
-		AddChild(ClickedOnMarker);
-
-		if (Engine.IsEditorHint() && FindChildren("label", owned: false).Count == 0)
-		{
-			AddChild(new Label3D()
-			{
-				Name="label",
-				Billboard=BaseMaterial3D.BillboardModeEnum.Enabled,
-				Text="HEX",
-				Scale=new(10, 10, 10),
-				Position=new(0, 5, 0),
-			});
-		}
-	}
-
-	public override void _Ready()
-	{
-		if (!Engine.IsEditorHint())
-		{
-			collisionArea.InputEvent += input_event;
-		}
-	}
+    private Dictionary<HextileConnection, HashSet<HextileConnection>> Connections = [];
 
 	private float _size = 6;
 
@@ -86,20 +45,66 @@ public partial class Hextile : Node3D, IClickable, IMouseEnterable
 
 	public HexGridProvider? _grid { get; set; }
 
-	public int _x { get; set; }
-	public int _y { get; set; }
+	public GridPosition Pos { get; private set; }
 
 	[Export]
-	public HexGridProvider? Grid { get => _grid; set { UpdateGrid(value, X, Y); } }
+	public HexGridProvider? Grid { get => _grid; set { UpdateGrid(value, Pos); } }
 
 	[Export]
-	public int X { get => _x; set { UpdateGrid(_grid, value, Y); } }
+	public int X { get => Pos.X; set { UpdateGrid(_grid, new(value, Y)); } }
 	[Export]
-	public int Y { get => _y; set { UpdateGrid(_grid, X, value); } }
+	public int Y { get => Pos.Y; set { UpdateGrid(_grid, new(X, value)); } }
 
 	private StandardMaterial3D? HexTex => Hexagon.Mesh.SurfaceGetMaterial(0) as StandardMaterial3D;
 
-	public void SetSize(float size)
+    public Hextile()
+    {
+        collisionArea = new Area3D();
+        AddChild(collisionArea);
+        collisionArea.AddChild(new CollisionShape3D() { Shape = Area3DShape });
+
+        Hexagon = new MeshInstance3D()
+        {
+            Mesh = hexMesh,
+            RotationDegrees = new(0, 30, 0),
+            Position = new(0, -1, 0),
+        };
+        AddChild(Hexagon);
+
+        ClickedOnMarker = new MeshInstance3D()
+        {
+            Mesh = clickedOnMesh,
+            Visible = false,
+            RotationDegrees = new(0, 30, 0),
+            Position = new(0, 1, 0),
+        };
+        AddChild(ClickedOnMarker);
+
+        if (Engine.IsEditorHint() && FindChildren("label", owned: false).Count == 0)
+        {
+            AddChild(new Label3D()
+            {
+                Name = "label",
+                Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+                Text = "HEX",
+                Scale = new(10, 10, 10),
+                Position = new(0, 5, 0),
+            });
+        }
+    }
+
+    public override void _Ready()
+    {
+        if (!Engine.IsEditorHint())
+        {
+            collisionArea.InputEvent += InputEvent;
+        }
+    }
+
+    public static string GetName(int x, int y) => $"Hextile_{x}_{y}";
+    public static string GetName(float x, float y) => GetName((int)x, (int)y);
+
+    public void SetSize(float size)
 	{
 		size = Mathf.Max(size, 6);
 		_size = size;
@@ -110,14 +115,14 @@ public partial class Hextile : Node3D, IClickable, IMouseEnterable
 		clickedOnMesh.BottomRadius = size;
 	}
 
-	private void Updated() => UpdateGrid(Grid, X, Y);
-	private void UpdateGrid(HexGridProvider? grid, int x, int y)
+	private void Updated() => UpdateGrid(Grid, Pos);
+	private void UpdateGrid(HexGridProvider? grid, GridPosition pos)
 	{
 		_grid = grid;
-		_x = x;
-		_y = y;
+        Pos = pos;
 
-		Name = $"Hextile_{x}_{y}";
+        var (x, y) = pos;
+		Name = GetName(x, y);
 		if (FindChild("label", owned: false) is Label3D label)
 			label.Text = $"{x}, {y}";
 
@@ -129,7 +134,7 @@ public partial class Hextile : Node3D, IClickable, IMouseEnterable
 		if (Grid == null)
 			return;
 
-		Transform = Grid.GetGridTransform(Size, x, y);
+		Transform = Grid.GetGridTransform(Size, pos);
 	}
 
 	private void setMaterial(Material? texture)
@@ -139,9 +144,175 @@ public partial class Hextile : Node3D, IClickable, IMouseEnterable
 		Hexagon.Mesh.SurfaceSetMaterial(0, texture);
 	}
 
+    #region Extending
 
-	#region Mouse Events
-	public void input_event(Node camera, InputEvent @event, Vector3 eventPosition, Vector3 normal, long shapeIdx)
+    static TrackStraight? CurrentExtendingTrack;
+    static HextileConnection CurrentExtendingDirection;
+    static int CurrentExtensionHeight;
+    static int StartingExtensionHeight;
+    static readonly List<Hextile> HighlightedNeighborsForExtension = [];
+    static Hextile? AddTrackOntoThisHex;
+
+    [Signal]
+	public delegate void OnChooseExtensionEventHandler(Hextile node);
+
+    public void Highlight(bool h = true)
+    {
+        ClickedOnMarker.Visible = h;
+    }
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void UnHighlight() => Highlight(false);
+
+    private void DisplayExtenderArrows()
+    {
+        var alreadyDisplayed = new HashSet<HextileConnection>();
+        foreach (var pair in TrainTracks)
+        {
+            var (connection, track) = pair;
+
+            var displayStart = !alreadyDisplayed.Contains(connection.One)
+                && TryGetNearNeighbor(connection.One.Index, out var startNeighbor)
+                && startNeighbor.CanConnectOnSide(connection.One.Opposite);
+
+            var displayEnd = !alreadyDisplayed.Contains(connection.Two)
+                && TryGetNearNeighbor(connection.Two.Index, out var endNeighbor)
+                && endNeighbor.CanConnectOnSide(connection.Two.Opposite);
+
+            if (displayStart) alreadyDisplayed.Add(connection.One);
+            if (displayEnd) alreadyDisplayed.Add(connection.Two);
+
+            track.SetExtensionIndicator(displayStart ? connection.One : default, displayEnd ? connection.Two : default);
+            if (displayStart || displayEnd)
+                track.ClickExtender += DisplayExtensionPossibilities;
+        }
+    }
+
+    private void DisplayExtensionPossibilities(TrackStraight track, RailExtendIndicator rei) => DisplayExtensionPossibilities(track, rei.Connection);
+
+    private void DisplayExtensionPossibilities(TrackStraight track, HextileConnection dir)
+    {
+        ResetConnectionState();
+
+        var neighbor = dir.ConnectionType switch
+        {
+            HextileConnectionType.Far => GetFarNeighbor(dir.Index),
+            HextileConnectionType.Near => GetNearNeighbor(dir.Index),
+        };
+
+        if (neighbor == null)
+            return;
+
+        var opposite = dir.Opposite;
+
+        var farNeighbors = opposite.ConnectionType switch
+        {
+            HextileConnectionType.Near => ConnectableFarNeighborRelativeIndexesFromNear,
+            HextileConnectionType.Far => ConnectableFarNeighborRelativeIndexesFromFar,
+        };
+
+        var nearNeighbors = opposite.ConnectionType switch
+        {
+            HextileConnectionType.Near => ConnectableNearNeighborRelativeIndexesFromNear,
+            HextileConnectionType.Far => ConnectableNearNeighborRelativeIndexesFromFar,
+        };
+
+        foreach (var far in farNeighbors)
+        {
+            var c = new HextileConnection(CurrentExtensionHeight, dir.Index + far, opposite.ConnectionType);
+            var c2 = new HextileConnection(CurrentExtensionHeight, opposite.Index + far, HextileConnectionType.Far);
+            if (neighbor.GetFarNeighbor(opposite.Index + far) is Hextile farNeighbor 
+                && farNeighbor.CanConnectOnSide(c)
+                && !neighbor.TrainTracks.ContainsKey(new HextileConnectionDouble(c2, opposite)))
+                HighlightedNeighborsForExtension.Add(farNeighbor);
+        }
+
+        foreach (var near in nearNeighbors)
+        {
+            var c = new HextileConnection(CurrentExtensionHeight, dir.Index + near, opposite.ConnectionType);
+            var c2 = new HextileConnection(CurrentExtensionHeight, opposite.Index + near, HextileConnectionType.Near);
+            if (neighbor.GetNearNeighbor(opposite.Index + near) is Hextile nearNeighbor
+                && nearNeighbor.CanConnectOnSide(c)
+                && !neighbor.TrainTracks.ContainsKey(new HextileConnectionDouble(c2, opposite)))
+                HighlightedNeighborsForExtension.Add(nearNeighbor);
+        }
+
+        foreach (var n in HighlightedNeighborsForExtension)
+        {
+            n.Highlight();
+            n.OnChooseExtension += OnChooseExtensionHandler;
+        }
+
+        if (HighlightedNeighborsForExtension.Count > 0)
+        {
+            CurrentExtendingTrack = track;
+            CurrentExtendingDirection = dir;
+            CurrentExtensionHeight = dir.Height;
+            StartingExtensionHeight = dir.Height;
+            AddTrackOntoThisHex = neighbor;
+
+            EmitSignalOnDisplayExtensions(neighbor);
+        }
+    }
+
+    private void UnhighlightAllConnections()
+    {
+        foreach (var n in HighlightedNeighborsForExtension)
+            n.UnHighlight();
+    }
+
+    private void UnsubscribeAllChooseExtensions()
+    {
+        foreach (var n in HighlightedNeighborsForExtension)
+        {
+            n.OnChooseExtension -= OnChooseExtensionHandler;
+        }
+    }
+
+    private void OnChooseExtensionHandler(Hextile node)
+    {
+        UnsubscribeAllChooseExtensions();
+        if (AddTrackOntoThisHex == null)
+            return;
+        AddTrackOntoThisHex.RemovePreviewTrack();
+        if (AddTrackOntoThisHex.ExtendTrackToHex(node, TrackDisplayType.Normal, out var c) is TrackStraight t)
+            AddTrackOntoThisHex.DisplayExtensionPossibilities(t, c);
+    }
+
+    private TrackStraight? ExtendTrackToHex(Hextile node, TrackDisplayType dtype, out HextileConnection c)
+    {
+        c = default;
+        if (Grid == null)
+            return null;
+
+        var o = CurrentExtendingDirection.Opposite;
+        var index = Grid.GetNeighborIndex(X, node.X, Y, node.Y);
+        var type = index >= 6 ? HextileConnectionType.Far : HextileConnectionType.Near;
+        c = new(CurrentExtensionHeight, new(index), type);
+        return AddTrack(o, c, dtype);
+    }
+
+    private TrackStraight? ExtendTrackToHex(Hextile node, TrackDisplayType dtype) => ExtendTrackToHex(node, dtype, out _);
+
+    private void ResetConnectionState()
+    {
+        AddTrackOntoThisHex?.RemovePreviewTrack();
+        CurrentExtendingDirection = default;
+        CurrentExtendingTrack?.GetParent<Hextile>().UnsubscribeAllChooseExtensions();
+        CurrentExtendingTrack = default;
+        AddTrackOntoThisHex = default;
+        UnhighlightAllConnections();
+        HighlightedNeighborsForExtension.Clear();
+    }
+
+    [Signal]
+    public delegate void OnDisplayExtensionsEventHandler(Hextile hex);
+
+    #endregion
+
+
+    #region Mouse Events
+    public void InputEvent(Node camera, InputEvent @event, Vector3 eventPosition, Vector3 normal, long shapeIdx)
 	{
 		if (@event is InputEventMouseButton mouseButton && mouseButton.IsReleased() && mouseButton.ButtonIndex == MouseButton.Left)
 			GlobalClickHelper.WasClicked(this);
@@ -151,26 +322,38 @@ public partial class Hextile : Node3D, IClickable, IMouseEnterable
 	}
 	void IClickable.OnClick()
 	{
-		ClickedOnMarker.Visible = true;
-	}
+		if (HighlightedNeighborsForExtension.Contains(this))
+			EmitSignalOnChooseExtension(this);
+        else
+            ResetConnectionState();
+    }
 
 	void IClickable.OnUnClick()
 	{
-		ClickedOnMarker.Visible = false;
-	}
+		UnhighlightAllConnections();
+    }
 
     void IMouseEnterable.OnEnter()
     {
-		foreach (var track in TrainTracks.Values)
-		{
-			track.SetExtensionIndicator(true, true);
-		}
+        if (HighlightedNeighborsForExtension.Contains(this))
+        {
+            AddTrackOntoThisHex?.RemovePreviewTrack();
+            AddTrackOntoThisHex?.ExtendTrackToHex(this, TrackDisplayType.Preview);
+        }
+        else if (HighlightedNeighborsForExtension.Count == 0) // if (mode == add-track)
+        {
+            DisplayExtenderArrows();
+        }
     }
     void IMouseEnterable.OnLeave()
     {
         foreach (var track in TrainTracks.Values)
         {
-            track.SetExtensionIndicator(false, false);
+            track.SetExtensionIndicator(default, default);
+			track.ClickExtender -= DisplayExtensionPossibilities;
+        }
+        if (HighlightedNeighborsForExtension.Contains(this))
+        {
         }
     }
     #endregion
@@ -184,27 +367,27 @@ public partial class Hextile : Node3D, IClickable, IMouseEnterable
 
 	public const int MAX_CONNECTIONS_ON_SIDE = 3;
 
-	public bool CanConnectOnSide(HextileConnection connection)
+    public bool CanConnectOnSide(HextileConnection connection)
 	{
 		var count = TrainTracks.Keys.Where(x => x.Has(connection)).ToList();
         if (count.Count == 0)
 			return true;
 		if (count.Count >= MAX_CONNECTIONS_ON_SIDE)
-			return false;
-		if (count.Any(x => x.HasHeightDifference()))
+            return false;
+        if (count.Any(x => x.HasHeightDifference()))
 			return false;
 		return true;
 	} 
 
-	public Hextile? GetNearNeighbor(int i)
+	public Hextile? GetNearNeighbor(NeighborId i)
 	{
-		if (Grid?.GetNeighborCoordinate(X, Y, Mathf.PosMod(i, 6)) is not Vector2 p)
+		if (Grid?.GetNeighborCoordinate(X, Y, (int)i) is not GridPosition p)
 			return null;
-		var name = $"Hextile_{p.X}_{p.Y}";
+		var name = GetName(p.X, p.Y);
 		return GetParent().GetChildrenByType<Hextile>().FirstOrDefault(x => x.Name == name);
 	}
 
-	public bool TryGetNearNeighbor(int i, [MaybeNullWhen(false)] out Hextile neighbor)
+	public bool TryGetNearNeighbor(NeighborId i, [MaybeNullWhen(false)] out Hextile neighbor)
 	{
 		if (GetNearNeighbor(i) is Hextile hex)
 		{
@@ -215,17 +398,17 @@ public partial class Hextile : Node3D, IClickable, IMouseEnterable
 		return false;
 	}
 
-	public Hextile? GetFarNeighbor(int i)
+	public Hextile? GetFarNeighbor(NeighborId i)
 	{
-		if (GetNearNeighbor(i) == null || GetNearNeighbor(i + CLOCKWISE) == null)
+		if (GetNearNeighbor(i) == null || GetNearNeighbor(-i) == null)
 			return null;
-		if (Grid?.GetNeighborCoordinate(X, Y, Mathf.PosMod(i, 6) + 6) is not Vector2 p)
+		if (Grid?.GetNeighborCoordinate(X, Y, (int)i + 6) is not GridPosition p)
 			return null;
-		var name = $"Hextile_{p.X}_{p.Y}";
-		return GetParent().GetChildrenByType<Hextile>().FirstOrDefault(x => x.Name == name);
+        var name = GetName(p.X, p.Y);
+        return GetParent().GetChildrenByType<Hextile>().FirstOrDefault(x => x.Name == name);
 	}
 
-	public bool TryGetFarNeighbor(int i, [MaybeNullWhen(false)] out Hextile neighbor)
+	public bool TryGetFarNeighbor(NeighborId i, [MaybeNullWhen(false)] out Hextile neighbor)
 	{
 		if (GetFarNeighbor(i) is Hextile hex)
 		{
@@ -250,15 +433,13 @@ public partial class Hextile : Node3D, IClickable, IMouseEnterable
 	/// <param name="to"></param>
 	/// <param name="displayType"></param>
 	/// <returns></returns>
-	public bool AddTrack(HextileConnection from, HextileConnection to, TrackDisplayType displayType)
+	public TrackStraight? AddTrack(HextileConnection from, HextileConnection to, TrackDisplayType displayType)
 	{
 		var connection = new HextileConnectionDouble(from, to);
 
-		var track = new TrackStraight()
-		{
-			Name = $"{Name}__{connection.One}__{connection.Two}",
-		};
-		var curve = new Curve3D();
+        if (TrainTracks.ContainsKey(connection))
+            return null;
+
 		Hextile? hex1 = null;
 		Hextile? hex2 = null;
 
@@ -273,7 +454,13 @@ public partial class Hextile : Node3D, IClickable, IMouseEnterable
             TryGetFarNeighbor(to.Index, out hex2);
 
 		if (hex1 == null || hex2 == null)
-			return false;
+			return null;
+
+        var track = new TrackStraight()
+        {
+            Name = $"{Name}__Track__{connection.One}__{connection.Two}",
+        };
+        var curve = new Curve3D();
 
         var p1 = GetNearNeighborSnapPoint(hex1) - Position;
         var p2 = GetNearNeighborSnapPoint(hex2) - Position;
@@ -282,10 +469,33 @@ public partial class Hextile : Node3D, IClickable, IMouseEnterable
 
         track.SetCurve(curve, displayType);
 		TrainTracks[connection] = track;
-		AddChild(track);
-		return true;
+        this.AddChildAsync(track);
+
+        RecordConnection(from, to);
+        RecordConnection(to, from);
+
+        return track;
 	}
 
+    /// <summary>
+    /// Add the connection record for pathfinding purposes
+    /// </summary>
+    /// <param name="from"></param>
+    /// <param name="to"></param>
+    private void RecordConnection(HextileConnection from, HextileConnection to)
+    {
+        if (Connections.TryGetValue(from, out var connections))
+            connections.Add(to);
+        else
+            Connections[from] = [to];
+    }
+
+    /// <summary>
+    /// Checks if placement is possible
+    /// </summary>
+    /// <param name="from"></param>
+    /// <param name="to"></param>
+    /// <returns></returns>
 	public bool CanAddTrack(HextileConnection from, HextileConnection to)
     {
         var connection = new HextileConnectionDouble(from, to);
@@ -297,14 +507,59 @@ public partial class Hextile : Node3D, IClickable, IMouseEnterable
 		return true;
     }
 
+    /// <summary>
+    /// Deletes the track (if it exists)
+    /// </summary>
+    /// <param name="from"></param>
+    /// <param name="to"></param>
 	public void RemoveTrack(HextileConnection from, HextileConnection to)
     {
         var connection = new HextileConnectionDouble(from, to);
         if (TrainTracks.Remove(connection, out var value))
 		{
 			RemoveChild(value);
+            RemoveConnectionRecord(from, to);
+            RemoveConnectionRecord(to, from);
+        }
+	}
+
+    /// <summary>
+    /// Removes the pathfinding connection record
+    /// </summary>
+    /// <param name="from"></param>
+    /// <param name="to"></param>
+    public void RemoveConnectionRecord(HextileConnection from, HextileConnection to)
+    {
+        if (Connections.TryGetValue(from, out var connections))
+            connections.Remove(to);
+    }
+
+    /// <summary>
+    /// During building, remove the preview track
+    /// </summary>
+	public void RemovePreviewTrack()
+	{
+		foreach (var pair in TrainTracks)
+		{
+			if (pair.Value.DisplayType == TrackDisplayType.Preview)
+            {
+                TrainTracks.Remove(pair.Key);
+                RemoveChild(pair.Value);
+				return;
+            }
 		}
 	}
 
-	#endregion
+
+    #endregion
+
+
+
+    float INode<Hextile, HextileConnection>.Weight => 1;
+    ICollection<(INode<Hextile, HextileConnection> neighbor, HextileConnection connection)> INode<Hextile, HextileConnection>.Neighbors(HextileConnection from)
+    {
+        if (!Connections.TryGetValue(from.Opposite, out var v))
+            return [];
+        return v.Select(x => (this as INode<Hextile, HextileConnection>, x)).ToList();
+    }
 }

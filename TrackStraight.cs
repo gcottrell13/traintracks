@@ -1,5 +1,7 @@
 using Godot;
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace traintracks;
 
@@ -19,6 +21,8 @@ public enum TrackDisplayType
 
 public partial class TrackStraight : Node3D
 {
+	[Signal]
+	public delegate void ClickExtenderEventHandler(TrackStraight node, RailExtendIndicator rei);
 
 	private TrackType _trackType = TrackType.DoubleRail;
 	public static readonly PackedScene ReiScene = GD.Load<PackedScene>("res://RailExtendIndicator.tscn");
@@ -27,7 +31,7 @@ public partial class TrackStraight : Node3D
 	public TrackType TrackType { get => _trackType; set { _trackType = value; GenerateRailGeometry(); } }
 
 	private Curve3D Curve;
-	private TrackDisplayType DisplayType;
+	public TrackDisplayType DisplayType { get; private set; }
 
     private Node3D TrackModel;
 
@@ -54,10 +58,6 @@ public partial class TrackStraight : Node3D
 		GenerateRailGeometry();
 	}
 
-	public override void _Process(double delta)
-	{
-	}
-
 	public void SetCurve(Curve3D curve, TrackDisplayType displayType)
 	{
 		Curve = curve;
@@ -72,7 +72,7 @@ public partial class TrackStraight : Node3D
 		}
 	}
 
-	public void SetExtensionIndicator(bool atStart, bool atback)
+	public void SetExtensionIndicator(HextileConnection atStart, HextileConnection atback)
     {
         if (reiStart != null)
         {
@@ -85,29 +85,31 @@ public partial class TrackStraight : Node3D
             reiBack = null;
         }
 
-        if (atStart)
+        if (atStart != default)
         {
             reiStart = ReiScene.Instantiate<RailExtendIndicator>();
 			reiStart.Name = $"{Name}__Start";
+			reiStart.Connection = atStart;
             var startPos = Curve.SampleBakedWithRotation(1);
             reiStart.Transform = startPos.TranslatedLocal(Vector3.Up);
 			AddChild(reiStart);
-			reiStart.OnClick += click;
+			reiStart.OnClick += OnClick;
         }
-        if (atback)
+        if (atback != default)
         {
             reiBack = ReiScene.Instantiate<RailExtendIndicator>();
 			reiBack.Name = $"{Name}__Back";
+            reiBack.Connection = atback;
             var startPos = Curve.SampleBakedWithRotation(Curve.GetBakedLength() - 1);
             reiBack.Transform = startPos.RotatedLocal(Vector3.Up, Mathf.Pi).TranslatedLocal(Vector3.Up);
 			AddChild(reiBack);
-            reiBack.OnClick += click;
+            reiBack.OnClick += OnClick;
         }
     }
 
-	public void click(RailExtendIndicator node)
+	private void OnClick(RailExtendIndicator node)
 	{
-		GD.Print($"Clicked on REI: {node.Name}");
+		EmitSignalClickExtender(this, node);
 	}
 
 
@@ -239,12 +241,13 @@ public partial class TrackStraight : Node3D
             rightRailMesh.Mesh.SurfaceSetMaterial(0, MaterialCache.Images.DoubleRailTrack.Rail_TimedGlow);
             leftRailMesh.Mesh.SurfaceSetMaterial(0, MaterialCache.Images.DoubleRailTrack.Rail_TimedGlow);
             barMesh.Mesh.SurfaceSetMaterial(0, MaterialCache.Images.DoubleRailTrack.Bar_TimedGlow);
-            rightRailMesh.SetInstanceShaderParameter("start_time", Root.time);
-            leftRailMesh.SetInstanceShaderParameter("start_time", Root.time);
-            barMesh.SetInstanceShaderParameter("start_time", Root.time);
-            Timing.RunCoroutine(this, SetNormalRailMaterialNonGlow(3, rightRailMesh.Mesh, MaterialCache.Images.DoubleRailTrack.Rail));
-            Timing.RunCoroutine(this, SetNormalRailMaterialNonGlow(3, leftRailMesh.Mesh, MaterialCache.Images.DoubleRailTrack.Rail));
-            Timing.RunCoroutine(this, SetNormalRailMaterialNonGlow(3, barMesh.Mesh, MaterialCache.Images.DoubleRailTrack.Bar));
+            rightRailMesh.SetInstanceShaderParameter("start_time", Root.TIME);
+            leftRailMesh.SetInstanceShaderParameter("start_time", Root.TIME);
+            barMesh.SetInstanceShaderParameter("start_time", Root.TIME);
+
+            this.RunCoroutine(SetNormalRailMaterialNonGlow(3, rightRailMesh.Mesh, MaterialCache.Images.DoubleRailTrack.Rail));
+            this.RunCoroutine(SetNormalRailMaterialNonGlow(3, leftRailMesh.Mesh, MaterialCache.Images.DoubleRailTrack.Rail));
+            this.RunCoroutine(SetNormalRailMaterialNonGlow(3, barMesh.Mesh, MaterialCache.Images.DoubleRailTrack.Bar));
         }
         else if (DisplayType == TrackDisplayType.Ghost)
         {
@@ -262,7 +265,7 @@ public partial class TrackStraight : Node3D
         return new DoubleRailTrackPart().SetMeshes(leftRailMesh, rightRailMesh, barMesh);
 	}
 
-	public IEnumerator<float> SetNormalRailMaterialNonGlow(float after, Mesh mesh, StandardMaterial3D material)
+	public static IEnumerator<float> SetNormalRailMaterialNonGlow(float after, Mesh mesh, StandardMaterial3D material)
 	{
 		yield return after;
 		mesh.SurfaceSetMaterial(0, material);

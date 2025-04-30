@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Reflection;
 
 namespace traintracks;
 
@@ -63,14 +64,15 @@ public partial class HexGridProvider : Resource
 
     private static readonly float sqrt_3 = (float)Math.Sqrt(3);
 
-    public Transform3D GetGridTransform(float size, int x, int y)
+    public Transform3D GetGridTransform(float size, GridPosition position)
     {
-        if ((GridType & GridType.FlatTop) != 0) return FlatTop(size, x, y);
-        return PointyTop(size, x, y);
+        if ((GridType & GridType.FlatTop) != 0) return FlatTop(size, position);
+        return PointyTop(size, position);
     }
 
-    private Transform3D FlatTop(float size, int x, int y)
+    private Transform3D FlatTop(float size, GridPosition position)
     {
+        var (x, y) = position;
         var horiz = size * 3 / 2;
         var vert = size * sqrt_3;
         var xx = x * horiz;
@@ -81,8 +83,9 @@ public partial class HexGridProvider : Resource
         return Transform.TranslatedLocal(new Vector3(xx, 0, yy));
     }
 
-    private Transform3D PointyTop(float size, int x, int y)
+    private Transform3D PointyTop(float size, GridPosition position)
     {
+        var (x, y) = position;
         var horiz = size * sqrt_3;
         var vert = size * 3 / 2;
         var xx = x * horiz;
@@ -93,8 +96,7 @@ public partial class HexGridProvider : Resource
         return Transform.TranslatedLocal(new Vector3(xx, 0, yy)) * rot;
     }
 
-    private static Vector2[] NeighborsOffsetOddX = [
-
+    private static GridPosition[] NeighborsOffsetOddX = [
             new(0, -1),
             new(1, 0),
             new(1, 1),
@@ -110,7 +112,7 @@ public partial class HexGridProvider : Resource
             new(-1, -1),
         ];
 
-    private static Vector2[] NeighborsOffsetEvenX = [
+    private static GridPosition[] NeighborsOffsetEvenX = [
             new(0, -1),
             new(1, -1),
             new(1, 0),
@@ -125,10 +127,21 @@ public partial class HexGridProvider : Resource
             new(-1, -2),
         ];
 
-    public Vector2 GetNeighborCoordinate(int x, int y, int index) => g switch
+    public GridPosition GetNeighborCoordinate(int x, int y, int index) => g switch
     {
         GridType.OffsetEvenX => Mathf.PosMod(x, 2) == 1 ? NeighborsOffsetEvenX[index] : NeighborsOffsetOddX[index],
         GridType.OffsetOddX => Mathf.PosMod(x, 2) == 1 ? NeighborsOffsetOddX[index] : NeighborsOffsetEvenX[index],
         _ => throw new NotImplementedException(),
-    } + new Vector2(x, y);
+    } + new GridPosition(x, y);
+
+    public int GetNeighborIndex(int x0, int x1, int y0, int y1)
+    {
+        var v = new GridPosition(x1 - x0, y1 - y0);
+        return g switch
+        {
+            GridType.OffsetEvenX => Mathf.PosMod(x0, 2) == 1 ? Array.IndexOf(NeighborsOffsetEvenX, v) : Array.IndexOf(NeighborsOffsetOddX, v),
+            GridType.OffsetOddX => Mathf.PosMod(x0, 2) == 1 ? Array.IndexOf(NeighborsOffsetOddX, v) : Array.IndexOf(NeighborsOffsetEvenX, v),
+            _ => throw new NotImplementedException(),
+        };
+    }
 }

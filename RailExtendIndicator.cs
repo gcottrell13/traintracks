@@ -10,6 +10,8 @@ public partial class RailExtendIndicator : Node3D
 	[Signal]
 	public delegate void OnClickEventHandler(RailExtendIndicator node);
 
+	public HextileConnection Connection;
+
 	public override void _Ready()
 	{
 		ClickableArea.InputEvent += click;

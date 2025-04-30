@@ -1,6 +1,8 @@
 using Godot;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using static traintracks.MaterialCache.Images;
 
 
 namespace traintracks;
@@ -8,7 +10,7 @@ namespace traintracks;
 
 public partial class Root : Node3D
 {
-	public static double time;
+	public static double TIME { get; private set; }
 	public readonly OrbitCamera3D Camera;
 
 	public Root()
@@ -24,27 +26,31 @@ public partial class Root : Node3D
 
 	public override void _EnterTree()
 	{
-		AddChild(Timing.CreateTree(this));
 		Camera.Current = true;
-	}
-
-	public override void _ExitTree()
-	{
-		Timing.RemoveTree(this);
 	}
 
 	public override void _Process(double delta)
 	{
-		time += delta;
-		RenderingServer.GlobalShaderParameterSet("GlobalTime", time);
+		TIME += delta;
+		RenderingServer.GlobalShaderParameterSet("GlobalTime", TIME);
+
+		var cameraMovement = Camera.Left * Input.GetAxis("ui_right", "ui_left") + Camera.Forward * Input.GetAxis("ui_down", "ui_up");
+
+		if (!cameraMovement.IsZeroApprox())
+		{
+			Camera.OrbitPoint += cameraMovement * (float)delta * 20;
+		}
 	}
 
 	public override void _Ready()
 	{
-		Timing.RunCoroutine(this, SetupTilesInGrid(10, 10));
-		//Timing.RunCoroutine(this, SetupRandomWalk(20));
-		//Timing.RunCoroutine(this, attach("Hextile2", 2, 4));
-	}
+		Task.Run(async () =>
+		{
+			await SetupTilesInGridAsync(10, 10);
+			await attachNearAsync();
+        });
+		// Timing.RunCoroutine(this, SetupTilesInGrid(10, 10)).Then(attachNear());
+    }
 
 	public IEnumerator<float> SetupRandomWalk(int length)
 	{
@@ -60,7 +66,6 @@ public partial class Root : Node3D
 			Transform = Transform3D.Identity,
 		};
 		
-		var rng = new RandomNumberGenerator();
 
 		var pos = new Vector2(0, 0);
 		var previousPositionsWithMultipleFreeDirections = new List<Vector2>();
@@ -76,10 +81,8 @@ public partial class Root : Node3D
 			{
 				if (previousPositionsWithMultipleFreeDirections.Count != 0)
 				{
-					var index = rng.RandiRange(0, previousPositionsWithMultipleFreeDirections.Count - 1);
-					pos = previousPositionsWithMultipleFreeDirections[index];
-					previousPositionsWithMultipleFreeDirections.RemoveAt(index);
-					i--;
+					previousPositionsWithMultipleFreeDirections.PopRandom();
+                    i--;
 					continue;
 				}
 				break;
@@ -89,7 +92,7 @@ public partial class Root : Node3D
 				previousPositionsWithMultipleFreeDirections.Add(pos);
 			}
 
-			pos = availablePositions[rng.RandiRange(0, availablePositions.Count - 1)];
+			pos = availablePositions.PopRandom();
 
 			var hextile = new Hextile
 			{
@@ -104,66 +107,78 @@ public partial class Root : Node3D
 		return tiles.Values;
 	}
 
-	public IEnumerator<float> SetupTilesInGrid(int w, int h)
-	{
-		var grid = new HexGridProvider
-		{
-			GridType = GridType.OffsetEvenX,
-		};
+    public IEnumerator<float> SetupTilesInGrid(int w, int h)
+    {
+        var wait = 0.01f;
+        var grid = new HexGridProvider
+        {
+            GridType = GridType.OffsetEvenX,
+        };
 
-		for (var i = 0; i < w; i++)
-		{
-			for (var j = 0; j < h; j++)
-			{
-				var hextile = new Hextile
-				{
-					X = i - w / 2,
-					Y = j - h / 2,
-					Grid = grid,
-					Texture = MaterialCache.Images.HexTile.GrassLg,
-				};
-				GD.Print($"{hextile} - {hextile.Position}");
+        for (var i = 0; i < w; i++)
+        {
+            for (var j = 0; j < h; j++)
+            {
+                var hextile = new Hextile
+                {
+                    X = i - w / 2,
+                    Y = j - h / 2,
+                    Grid = grid,
+                    Texture = HexTile.GrassLg,
+                };
+                hextile.OnDisplayExtensions += OnDisplayExtensions;
 				AddChild(hextile);
-				yield return 0.01f;
+                yield return wait;
+            }
+        }
+    }
 
 
-				for (var k = 0; k < 3; k++)
-				{
-					Timing.RunCoroutine(this, attachNear(hextile, k, k + 3));
-				}
-			}
-		}
-	}
+    public async Task SetupTilesInGridAsync(int w, int h)
+    {
+        var wait = 10;
+        var grid = new HexGridProvider
+        {
+            GridType = GridType.OffsetEvenX,
+        };
 
-	public void PlaceTracks(IEnumerable<Hextile> tiles)
+        for (var i = 0; i < w; i++)
+        {
+            for (var j = 0; j < h; j++)
+            {
+                var hextile = new Hextile
+                {
+                    X = i - w / 2,
+                    Y = j - h / 2,
+                    Grid = grid,
+                    Texture = HexTile.GrassLg,
+                };
+                hextile.OnDisplayExtensions += OnDisplayExtensions;
+				this.AddChildAsync(hextile);
+                await Task.Delay(wait);
+            }
+        }
+    }
+    
+	private async void OnDisplayExtensions(Hextile hextile)
 	{
-		foreach (var tile in tiles)
-		{
-			for (var i = 0; i < 3; i++)
-			{
-				Timing.RunCoroutine(this, attachNear(tile, i, i + 3));
-			}
-
-			//for (var i = 0; i < 6; i++)
-			//{
-			//	Timing.RunCoroutine(this, attachNear(tile, i, i + 4));
-			//}
-
-			//for (var i = 0; i < 6; i++)
-			//{
-			//	Timing.RunCoroutine(this, attachFar(tile, i, i + 1));
-			//	Timing.RunCoroutine(this, attachFar(tile, i, i + 2));
-			//	Timing.RunCoroutine(this, attachFar(tile, i, i + 3));
-			//	Timing.RunCoroutine(this, attachFar(tile, i, i + 4));
-			//}
-		}
+		await Task.Delay(1000);
+		Camera.OrbitPoint = hextile.Position;
 	}
 
-	public IEnumerator<float> attachNear(Hextile hex, int one1, int two2)
-	{
-		hex.AddTrack(new(0, (byte)one1, HextileConnectionType.Near), new(0, (byte)two2, HextileConnectionType.Near), TrackDisplayType.Ghost);
-		yield return 0.1f;
+	public IEnumerator<float> attachNear()
+    {
+		var hex = (Hextile)FindChild(Hextile.GetName(1, 1), owned: false);
+        yield return 0.1f;
+        hex.AddTrack(new(0, new(0), HextileConnectionType.Near), new(0, new(2), HextileConnectionType.Near), TrackDisplayType.Normal);
 	}
+
+	public async Task attachNearAsync()
+    {
+        var hex = (Hextile)FindChild(Hextile.GetName(1, 1), owned: false);
+		await Task.Delay(100);
+        hex.AddTrack(new(0, new(0), HextileConnectionType.Near), new(0, new(2), HextileConnectionType.Near), TrackDisplayType.Normal);
+    }
 
 	public bool DidMoveFromRightClick = false;
 
@@ -175,7 +190,7 @@ public partial class Root : Node3D
 		{
 			if (!mouseMotion.Relative.IsZeroApprox() && Input.IsMouseButtonPressed(MouseButton.Right))
 			{
-				Camera.AngleAround -= mouseMotion.Relative.X * 0.01f;
+				Camera.AngleAround += mouseMotion.Relative.X * 0.01f;
 				Camera.AngleHeight = Mathf.Clamp(Camera.AngleHeight + mouseMotion.Relative.Y * 0.01f, Mathf.Pi / 8, 1.5f);
 				DidMoveFromRightClick = true;
 			}
@@ -184,20 +199,6 @@ public partial class Root : Node3D
 		{
 			switch (mouseButton.ButtonIndex)
 			{
-				case MouseButton.WheelDown or MouseButton.WheelUp:
-					{
-						var dir = mouseButton.ButtonIndex == MouseButton.WheelDown ? 1 : -1;
-						if (Camera.Projection == Camera3D.ProjectionType.Perspective)
-						{
-							Camera.Distance = Mathf.Clamp(Camera.Distance + mouseButton.Factor * dir, 10, 300);
-						}
-						else if (Camera.Projection == Camera3D.ProjectionType.Orthogonal)
-						{
-							Camera.Size = Mathf.Clamp(Camera.Size + dir * mouseButton.Factor, 10, 500);
-						}
-
-						break;
-					}
 				case MouseButton.Right:
 					{
 						if (mouseButton.IsReleased())

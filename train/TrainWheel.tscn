@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3 uid="uid://blg7uyyo05l6c"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_5vswo"]
+height = 0.2
+radial_segments = 12
+
+[node name="TrainWheel" type="Node3D"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(-4.37114e-08, -1, -4.37114e-08, 0, -4.37114e-08, 1, -1, 4.37114e-08, 1.91069e-15, 1, 0.5, 0)
+mesh = SubResource("CylinderMesh_5vswo")
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="."]
+transform = Transform3D(-4.37114e-08, -1, -4.37114e-08, 0, -4.37114e-08, 1, -1, 4.37114e-08, 1.91069e-15, -1, 0.5, 0)
+mesh = SubResource("CylinderMesh_5vswo")

@@ -34,6 +34,9 @@ public partial class OrbitCamera3D : Camera3D
     [Export]
     public Vector3 Axis { get => _axis; set { SetValues(axis: value); } }
 
+    public Vector3 Forward { get; private set; }
+    public Vector3 Left { get; private set; }
+
 
     public void SetValues(Vector3? point = null, float? angleY = null, float? angleZ = null, float? distance = null, Vector3? axis = null)
     {
@@ -51,5 +54,9 @@ public partial class OrbitCamera3D : Camera3D
         var r = new Vector3(Mathf.Cos(AngleAround), Mathf.Sin(AngleAround), -Mathf.Sin(AngleHeight)) * Distance; // negative in Z because we want positive angles to result in positive heights
         var x = t.Basis * r;
         LookAtFromPosition(x + OrbitPoint, OrbitPoint);
+        Forward = -t.Basis.X.Rotated(t.Basis.Z, AngleAround);
+        Left = t.Basis.Y.Rotated(t.Basis.Z, AngleAround);
+        //if (IsInsideTree() && GetFrustum()[5].IntersectsRay(OrbitPoint, -Axis) is Vector3 intersect)
+        //    Position += OrbitPoint - intersect;
     }
 }

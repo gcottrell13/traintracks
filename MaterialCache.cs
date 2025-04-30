@@ -55,6 +55,8 @@ public static class MaterialCache
                 AlbedoTexture = GD.Load<Texture2D>("res://images/track-ghost.png"),
                 AlbedoColor = new Color(0, 0, 1),
                 Transparency = TransparencyEnum.Alpha,
+                Emission = new(0, 0, 1),
+                EmissionEnabled = true,
             };
         }
 

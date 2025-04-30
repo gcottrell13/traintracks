@@ -26,4 +26,6 @@ public static class NodeExtensions
         _ = fn(tokenSource2.Token);
         return tokenSource2;
     }
+
+    public static void AddChildAsync(this Node node, Node child) => node.CallDeferred("add_child", child);
 }
